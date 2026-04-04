@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: "Inter", system-ui, sans-serif;
+  }
+  [lang="ar"] {
+    font-family: "Cairo", "Noto Sans Arabic", sans-serif;
+    direction: rtl;
+  }
+}
+
+/* SurveyJS theme overrides */
+.sd-root-modern {
+  --sd-base-padding: 1.5rem;
+  --sd-base-unit: 8px;
+  --primary: #d97c2a;
+  --primary-foreground: #ffffff;
+}
+
+.sd-btn--action {
+  background-color: #d97c2a !important;
+}
+
+.sd-progress-bar {
+  background-color: #d97c2a !important;
+}

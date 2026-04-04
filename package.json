@@ -1,0 +1,27 @@
+{
+  "name": "sawa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sawa — Workplace Culture & People Intelligence Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w apps/web\" \"npm run dev -w apps/api\" \"npm run dev -w packages/scoring\"",
+    "build": "npm run build -w packages/database && npm run build -w apps/api && npm run build -w apps/web",
+    "db:generate": "npm run generate -w packages/database",
+    "db:migrate": "npm run migrate -w packages/database",
+    "db:seed": "npm run seed -w packages/database",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

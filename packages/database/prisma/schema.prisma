@@ -1,0 +1,289 @@
+// Sawa — Workplace Culture & People Intelligence Platform
+// PostgreSQL schema via Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN        // Sawa platform admin — full access
+  EXECUTIVE    // HR/Executive client — their org only
+  EMPLOYEE     // Anonymous respondent — no login required
+}
+
+enum AssessmentType {
+  CBI          // Copenhagen Burnout Inventory (19 items)
+  PSS          // Perceived Stress Scale (10 items)
+  WHO5         // WHO-5 Wellbeing Index (5 items)
+  CULTURE      // Proprietary Culture Assessment (40 items)
+}
+
+enum CycleStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum ReportType {
+  WEEKLY
+  MONTHLY
+  AD_HOC
+}
+
+enum AuditAction {
+  USER_CREATED
+  USER_UPDATED
+  USER_DELETED
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  CYCLE_CREATED
+  CYCLE_ACTIVATED
+  CYCLE_CLOSED
+  RESPONSE_SUBMITTED
+  CONSENT_GIVEN
+  REPORT_GENERATED
+  DATA_EXPORT
+  DATA_DELETED
+  ROLE_CHANGED
+}
+
+// ─── Organisations ──────────────────────────────────────────────────────────
+
+model Organisation {
+  id          String   @id @default(cuid())
+  name        String
+  nameAr      String?  @map("name_ar")
+  slug        String   @unique
+  logoUrl     String?  @map("logo_url")
+  industry    String?
+  sizeRange   String?  @map("size_range")   // e.g. "50-200"
+  countryCode String   @default("SA") @map("country_code")
+  timezone    String   @default("Asia/Riyadh")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  departments Department[]
+  users       User[]
+  cycles      AssessmentCycle[]
+  reports     Report[]
+
+  @@map("organisations")
+}
+
+model Department {
+  id             String       @id @default(cuid())
+  organisationId String       @map("organisation_id")
+  name           String
+  nameAr         String?      @map("name_ar")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  respondents    Respondent[]
+
+  @@map("departments")
+}
+
+// ─── Users (Admin + Executive/HR — employees use anonymous tokens) ──────────
+
+model User {
+  id             String       @id @default(cuid())
+  organisationId String?      @map("organisation_id")
+  email          String       @unique
+  passwordHash   String       @map("password_hash")
+  firstName      String       @map("first_name")
+  lastName       String       @map("last_name")
+  role           UserRole
+  isActive       Boolean      @default(true) @map("is_active")
+  lastLoginAt    DateTime?    @map("last_login_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  deletedAt      DateTime?    @map("deleted_at")
+
+  organisation   Organisation? @relation(fields: [organisationId], references: [id])
+  refreshTokens  RefreshToken[]
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ─── Assessment Definitions ─────────────────────────────────────────────────
+
+model Assessment {
+  id           String         @id @default(cuid())
+  type         AssessmentType @unique
+  name         String
+  nameAr       String?        @map("name_ar")
+  description  String?
+  itemCount    Int            @map("item_count")
+  // SurveyJS JSON schema for the form
+  surveySchema Json           @map("survey_schema")
+  // Scoring rules stored as JSON (bands, reverse items, subscales)
+  scoringRules Json           @map("scoring_rules")
+  version      String         @default("1.0")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  cycles AssessmentCycle[]
+
+  @@map("assessments")
+}
+
+// ─── Assessment Cycles ──────────────────────────────────────────────────────
+
+model AssessmentCycle {
+  id             String         @id @default(cuid())
+  organisationId String         @map("organisation_id")
+  assessmentId   String         @map("assessment_id")
+  title          String
+  status         CycleStatus    @default(DRAFT)
+  startsAt       DateTime       @map("starts_at")
+  endsAt         DateTime       @map("ends_at")
+  // Unique public link token for anonymous employees
+  linkToken      String         @unique @default(cuid()) @map("link_token")
+  reminderSentAt DateTime?      @map("reminder_sent_at")
+  closedAt       DateTime?      @map("closed_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  organisation Organisation  @relation(fields: [organisationId], references: [id])
+  assessment   Assessment    @relation(fields: [assessmentId], references: [id])
+  respondents  Respondent[]
+  reports      Report[]
+
+  @@map("assessment_cycles")
+}
+
+// ─── Respondents (anonymous employees) ──────────────────────────────────────
+
+model Respondent {
+  id             String    @id @default(cuid())
+  cycleId        String    @map("cycle_id")
+  departmentId   String?   @map("department_id")
+  // Pseudonymous token — never linked to PII
+  sessionToken   String    @unique @default(cuid()) @map("session_token")
+  consentGiven   Boolean   @default(false) @map("consent_given")
+  consentAt      DateTime? @map("consent_at")
+  consentIp      String?   @map("consent_ip")
+  consentVersion String?   @map("consent_version")
+  submittedAt    DateTime? @map("submitted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  cycle       AssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  department  Department?     @relation(fields: [departmentId], references: [id])
+  responses   Response[]
+  scores      Score[]
+
+  @@map("respondents")
+}
+
+// ─── Raw Responses (one row per question per respondent) ────────────────────
+
+model Response {
+  id           String   @id @default(cuid())
+  respondentId String   @map("respondent_id")
+  questionKey  String   @map("question_key")    // e.g. "cbi_1", "pss_4"
+  rawValue     Int      @map("raw_value")        // numeric answer value
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  respondent Respondent @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+
+  @@unique([respondentId, questionKey])
+  @@map("responses")
+}
+
+// ─── Computed Scores ────────────────────────────────────────────────────────
+
+model Score {
+  id           String   @id @default(cuid())
+  respondentId String   @map("respondent_id")
+  // subscale name: "personal_burnout", "work_burnout", "client_burnout",
+  //   "total", "leadership", "psychological_safety", etc.
+  subscale     String
+  rawScore     Float    @map("raw_score")
+  scaledScore  Float    @map("scaled_score")   // normalised 0-100
+  band         String   // "Low" | "Moderate" | "High" | "Needs Attention" etc.
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  respondent Respondent @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+
+  @@unique([respondentId, subscale])
+  @@map("scores")
+}
+
+// ─── Reports ────────────────────────────────────────────────────────────────
+
+model Report {
+  id             String     @id @default(cuid())
+  organisationId String     @map("organisation_id")
+  cycleId        String?    @map("cycle_id")
+  type           ReportType
+  periodStart    DateTime   @map("period_start")
+  periodEnd      DateTime   @map("period_end")
+  // GCS URL of the generated PDF
+  pdfUrl         String?    @map("pdf_url")
+  generatedAt    DateTime?  @map("generated_at")
+  // Summary stats cached as JSON
+  summaryData    Json?      @map("summary_data")
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  organisation Organisation   @relation(fields: [organisationId], references: [id])
+  cycle        AssessmentCycle? @relation(fields: [cycleId], references: [id])
+
+  @@map("reports")
+}
+
+// ─── Audit Log ──────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String?     @map("user_id")       // null for anonymous actions
+  action     AuditAction
+  entityType String?     @map("entity_type")   // e.g. "Respondent", "User"
+  entityId   String?     @map("entity_id")
+  metadata   Json?                             // extra context (IP, changes, etc.)
+  ipAddress  String?     @map("ip_address")
+  userAgent  String?     @map("user_agent")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─── Data Deletion Requests (GDPR/PDPL compliance) ──────────────────────────
+
+model DataDeletionRequest {
+  id           String    @id @default(cuid())
+  // Session token of the respondent who requested deletion
+  sessionToken String    @map("session_token")
+  requestedAt  DateTime  @default(now()) @map("requested_at")
+  processedAt  DateTime? @map("processed_at")
+  status       String    @default("PENDING")   // PENDING | COMPLETED
+
+  @@map("data_deletion_requests")
+}

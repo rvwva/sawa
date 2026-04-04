@@ -1,0 +1,119 @@
+import { PrismaClient, AssessmentType } from "@prisma/client";
+import {
+  CBI_SURVEY_SCHEMA,
+  CBI_SCORING_RULES,
+} from "../../scoring/definitions/cbi";
+import {
+  PSS_SURVEY_SCHEMA,
+  PSS_SCORING_RULES,
+} from "../../scoring/definitions/pss";
+import {
+  WHO5_SURVEY_SCHEMA,
+  WHO5_SCORING_RULES,
+} from "../../scoring/definitions/who5";
+import {
+  CULTURE_SURVEY_SCHEMA,
+  CULTURE_SCORING_RULES,
+} from "../../scoring/definitions/culture";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log("Seeding assessment definitions…");
+
+  const assessments = [
+    {
+      type: AssessmentType.CBI,
+      name: "Copenhagen Burnout Inventory",
+      nameAr: "مقياس كوبنهاغن للاحتراق الوظيفي",
+      description:
+        "Measures personal, work-related, and client-related burnout across 19 items.",
+      itemCount: 19,
+      surveySchema: CBI_SURVEY_SCHEMA,
+      scoringRules: CBI_SCORING_RULES,
+      version: "1.0",
+    },
+    {
+      type: AssessmentType.PSS,
+      name: "Perceived Stress Scale",
+      nameAr: "مقياس الضغط النفسي المُدرَك",
+      description:
+        "Measures the degree to which life situations are appraised as stressful across 10 items.",
+      itemCount: 10,
+      surveySchema: PSS_SURVEY_SCHEMA,
+      scoringRules: PSS_SCORING_RULES,
+      version: "1.0",
+    },
+    {
+      type: AssessmentType.WHO5,
+      name: "WHO-5 Wellbeing Index",
+      nameAr: "مؤشر الرفاهية WHO-5",
+      description:
+        "Short, self-reported measure of current mental wellbeing across 5 items.",
+      itemCount: 5,
+      surveySchema: WHO5_SURVEY_SCHEMA,
+      scoringRules: WHO5_SCORING_RULES,
+      version: "1.0",
+    },
+    {
+      type: AssessmentType.CULTURE,
+      name: "Sawa Culture Assessment",
+      nameAr: "تقييم ثقافة سواء",
+      description:
+        "Proprietary 9-dimension workplace culture assessment across 40 items.",
+      itemCount: 40,
+      surveySchema: CULTURE_SURVEY_SCHEMA,
+      scoringRules: CULTURE_SCORING_RULES,
+      version: "1.0",
+    },
+  ];
+
+  for (const a of assessments) {
+    await prisma.assessment.upsert({
+      where: { type: a.type },
+      update: {
+        surveySchema: a.surveySchema as any,
+        scoringRules: a.scoringRules as any,
+        updatedAt: new Date(),
+      },
+      create: a as any,
+    });
+    console.log(`  ✓ ${a.name}`);
+  }
+
+  console.log("\nSeeding demo organisation…");
+  const org = await prisma.organisation.upsert({
+    where: { slug: "demo-corp" },
+    update: {},
+    create: {
+      name: "Demo Corporation",
+      nameAr: "شركة ديمو",
+      slug: "demo-corp",
+      industry: "Technology",
+      sizeRange: "200-500",
+      countryCode: "SA",
+      timezone: "Asia/Riyadh",
+    },
+  });
+
+  await prisma.department.createMany({
+    skipDuplicates: true,
+    data: [
+      { organisationId: org.id, name: "Engineering", nameAr: "الهندسة" },
+      { organisationId: org.id, name: "Human Resources", nameAr: "الموارد البشرية" },
+      { organisationId: org.id, name: "Operations", nameAr: "العمليات" },
+      { organisationId: org.id, name: "Finance", nameAr: "المالية" },
+      { organisationId: org.id, name: "Sales", nameAr: "المبيعات" },
+    ],
+  });
+
+  console.log("  ✓ Demo org + 5 departments created");
+  console.log("\nSeed complete.");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());
