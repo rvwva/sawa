@@ -2,19 +2,25 @@
   "name": "@sawa/database",
   "version": "1.0.0",
   "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "scripts": {
-    "generate": "prisma generate",
-    "migrate": "prisma migrate deploy",
+    "generate":    "prisma generate",
+    "migrate":     "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
-    "migrate:reset": "prisma migrate reset",
-    "seed": "tsx prisma/seed.ts",
-    "studio": "prisma studio"
+    "migrate:reset": "prisma migrate reset --force",
+    "seed":        "tsx prisma/seed.ts",
+    "studio":      "prisma studio",
+    "push":        "prisma db push"
   },
   "dependencies": {
     "@prisma/client": "^5.10.2"
   },
   "devDependencies": {
     "prisma": "^5.10.2",
-    "tsx": "^4.7.1"
+    "tsx":    "^4.7.1"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

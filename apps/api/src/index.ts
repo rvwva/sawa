@@ -9,12 +9,14 @@ import rateLimit from "express-rate-limit";
 import { authRouter } from "./routes/auth";
 import { assessmentsRouter } from "./routes/assessments";
 import { responsesRouter } from "./routes/responses";
+import { resultsRouter } from "./routes/results";
 import { reportsRouter } from "./routes/reports";
 import { usersRouter } from "./routes/users";
 import { adminRouter } from "./routes/admin";
 import { dataRightsRouter } from "./routes/dataRights";
 import { errorHandler } from "./middleware/errorHandler";
 import { logger } from "./lib/logger";
+import { checkDatabaseConnection } from "./lib/prisma";
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT ?? "4000", 10);
@@ -51,13 +53,19 @@ const submissionLimiter = rateLimit({
 app.use("/api/auth", authRouter);
 app.use("/api/assessments", assessmentsRouter);
 app.use("/api/responses", submissionLimiter, responsesRouter);
+app.use("/api/results", resultsRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/data-rights", dataRightsRouter);
 
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+app.get("/api/health", async (_req, res) => {
+  const dbOk = await checkDatabaseConnection();
+  res.status(dbOk ? 200 : 503).json({
+    status: dbOk ? "ok" : "degraded",
+    db: dbOk ? "connected" : "unreachable",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // ─── Error handler ─────────────────────────────────────────────────────────

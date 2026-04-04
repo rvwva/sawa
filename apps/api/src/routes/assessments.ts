@@ -1,7 +1,17 @@
 import { Router, Request, Response } from "express";
+import { body, validationResult } from "express-validator";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
+import { auditLog } from "../middleware/audit";
+import { AuditAction } from "@prisma/client";
+import { buildCycleSummary } from "../services/scoring";
+import {
+  sendCycleClosedNotification,
+  sendCycleInvite,
+  sendCycleReminder,
+} from "../services/email";
+import { logger } from "../lib/logger";
 
 export const assessmentsRouter = Router();
 
@@ -39,10 +49,18 @@ assessmentsRouter.post(
   "/cycles",
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
+  [
+    body("title").notEmpty().isString(),
+    body("assessmentType").isIn(["CBI", "PSS", "WHO5", "CULTURE"]),
+    body("startsAt").isISO8601(),
+    body("endsAt").isISO8601(),
+  ],
   async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
     const { organisationId, assessmentType, title, startsAt, endsAt } = req.body;
 
-    // Executives can only create cycles for their own org
     const targetOrgId =
       req.user!.role === "ADMIN" ? organisationId : req.user!.organisationId;
     if (!targetOrgId) return res.status(400).json({ error: "Organisation ID required" });
@@ -61,6 +79,13 @@ assessmentsRouter.post(
         endsAt: new Date(endsAt),
         status: "DRAFT",
       },
+    });
+
+    await auditLog(AuditAction.CYCLE_CREATED, {
+      userId: req.user!.userId,
+      entityType: "AssessmentCycle",
+      entityId: cycle.id,
+      req,
     });
 
     return res.status(201).json(cycle);
@@ -97,11 +122,17 @@ assessmentsRouter.patch(
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
   async (req: Request, res: Response) => {
-    const cycle = await prisma.assessmentCycle.findUnique({ where: { id: req.params.id } });
+    const cycle = await prisma.assessmentCycle.findUnique({
+      where: { id: req.params.id },
+      include: { assessment: true, organisation: true },
+    });
     if (!cycle) return res.status(404).json({ error: "Cycle not found" });
 
     if (req.user!.role === "EXECUTIVE" && cycle.organisationId !== req.user!.organisationId) {
       return res.status(403).json({ error: "Access denied" });
+    }
+    if (cycle.status !== "DRAFT") {
+      return res.status(409).json({ error: `Cycle is already ${cycle.status}` });
     }
 
     const updated = await prisma.assessmentCycle.update({
@@ -109,7 +140,154 @@ assessmentsRouter.patch(
       data: { status: "ACTIVE" },
     });
 
+    await auditLog(AuditAction.CYCLE_ACTIVATED, {
+      userId: req.user!.userId,
+      entityType: "AssessmentCycle",
+      entityId: cycle.id,
+      req,
+    });
+
+    // Optionally send invite emails if recipientEmails provided in body
+    const { recipientEmails } = req.body as { recipientEmails?: string[] };
+    if (recipientEmails && recipientEmails.length > 0) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      sendCycleInvite({
+        recipientEmails,
+        organisationName: cycle.organisation.name,
+        assessmentName: cycle.assessment.name,
+        cycleTitle: cycle.title,
+        assessmentUrl: `${appUrl}/assess/${cycle.linkToken}`,
+        endsAt: cycle.endsAt,
+      }).catch((err) => logger.error("Failed to send invite emails", { err }));
+    }
+
     return res.json(updated);
+  }
+);
+
+// PATCH /api/assessments/cycles/:id/remind
+// Re-send reminder emails to a list of recipients
+assessmentsRouter.patch(
+  "/cycles/:id/remind",
+  requireAuth,
+  requireRole("ADMIN", "EXECUTIVE"),
+  [body("recipientEmails").isArray({ min: 1 })],
+  async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const cycle = await prisma.assessmentCycle.findUnique({
+      where: { id: req.params.id },
+      include: { assessment: true, organisation: true },
+    });
+    if (!cycle) return res.status(404).json({ error: "Cycle not found" });
+    if (cycle.status !== "ACTIVE") {
+      return res.status(409).json({ error: "Only ACTIVE cycles can send reminders" });
+    }
+    if (req.user!.role === "EXECUTIVE" && cycle.organisationId !== req.user!.organisationId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const daysRemaining = Math.ceil(
+      (cycle.endsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    );
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+    await sendCycleReminder({
+      recipientEmails: req.body.recipientEmails,
+      organisationName: cycle.organisation.name,
+      assessmentName: cycle.assessment.name,
+      cycleTitle: cycle.title,
+      assessmentUrl: `${appUrl}/assess/${cycle.linkToken}`,
+      endsAt: cycle.endsAt,
+      daysRemaining,
+    });
+
+    await prisma.assessmentCycle.update({
+      where: { id: cycle.id },
+      data: { reminderSentAt: new Date() },
+    });
+
+    return res.json({ message: `Reminder sent to ${req.body.recipientEmails.length} recipients` });
+  }
+);
+
+// PATCH /api/assessments/cycles/:id/close
+// Closes a cycle: marks CLOSED, builds summary snapshot, notifies HR.
+assessmentsRouter.patch(
+  "/cycles/:id/close",
+  requireAuth,
+  requireRole("ADMIN", "EXECUTIVE"),
+  async (req: Request, res: Response) => {
+    const cycle = await prisma.assessmentCycle.findUnique({
+      where: { id: req.params.id },
+      include: { assessment: true, organisation: true },
+    });
+    if (!cycle) return res.status(404).json({ error: "Cycle not found" });
+
+    if (req.user!.role === "EXECUTIVE" && cycle.organisationId !== req.user!.organisationId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    if (cycle.status === "CLOSED" || cycle.status === "ARCHIVED") {
+      return res.status(409).json({ error: `Cycle is already ${cycle.status}` });
+    }
+
+    // 1. Mark closed
+    await prisma.assessmentCycle.update({
+      where: { id: cycle.id },
+      data: { status: "CLOSED", closedAt: new Date() },
+    });
+
+    await auditLog(AuditAction.CYCLE_CLOSED, {
+      userId: req.user!.userId,
+      entityType: "AssessmentCycle",
+      entityId: cycle.id,
+      req,
+    });
+
+    // 2. Build + cache summary snapshot (non-blocking)
+    buildCycleSummary(cycle.id)
+      .then(async (summary) => {
+        await prisma.report.create({
+          data: {
+            organisationId: cycle.organisationId,
+            cycleId: cycle.id,
+            type: "AD_HOC",
+            periodStart: cycle.startsAt,
+            periodEnd: cycle.endsAt,
+            summaryData: summary as any,
+            generatedAt: new Date(),
+          },
+        });
+      })
+      .catch((err) => logger.error("Failed to build cycle summary", { err, cycleId: cycle.id }));
+
+    // 3. Notify the closing HR/Executive user by email (non-blocking)
+    const respondentCount = await prisma.respondent.count({
+      where: { cycleId: cycle.id, submittedAt: { not: null } },
+    });
+    const closingUser = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { email: true },
+    });
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+    if (closingUser?.email) {
+      sendCycleClosedNotification({
+        recipientEmail: closingUser.email,
+        organisationName: cycle.organisation.name,
+        cycleTitle: cycle.title,
+        assessmentName: cycle.assessment.name,
+        respondentCount,
+        dashboardUrl: `${appUrl}/dashboard/cycles/${cycle.id}`,
+      }).catch((err) => logger.error("Failed to send cycle-closed email", { err }));
+    }
+
+    return res.json({
+      message: "Cycle closed successfully",
+      cycleId: cycle.id,
+      respondentCount,
+    });
   }
 );
 
