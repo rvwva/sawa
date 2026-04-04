@@ -2,28 +2,243 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Google Fonts ─────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;600;700;800&display=swap');
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
 @layer base {
   html {
     font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  [lang="ar"] {
+
+  /* Arabic RTL mode — triggered by dir="rtl" on a container element */
+  [dir="rtl"] {
     font-family: "Cairo", "Noto Sans Arabic", sans-serif;
-    direction: rtl;
+  }
+
+  /* Smooth print */
+  @media print {
+    html { font-size: 13px; }
   }
 }
 
-/* SurveyJS theme overrides */
-.sd-root-modern {
-  --sd-base-padding: 1.5rem;
-  --sd-base-unit: 8px;
-  --primary: #d97c2a;
-  --primary-foreground: #ffffff;
+/* ── Custom animations ────────────────────────────────────────────────────── */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.35s ease-out both;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 }
 
-.sd-btn--action {
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* SurveyJS "defaultV2" theme overrides — Sawa brand                          */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+/* Container */
+.sd-root-modern,
+.sd-container-modern {
+  background: transparent !important;
+  font-family: "Inter", system-ui, sans-serif !important;
+}
+
+[dir="rtl"] .sd-root-modern,
+[dir="rtl"] .sd-container-modern {
+  font-family: "Cairo", "Noto Sans Arabic", sans-serif !important;
+}
+
+/* Page / panel */
+.sd-page,
+.sd-panel {
+  padding: 24px !important;
+}
+
+.sd-page__title {
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  color: #111827 !important;
+  margin-bottom: 4px !important;
+}
+
+.sd-page__description {
+  font-size: 0.875rem !important;
+  color: #6b7280 !important;
+  margin-bottom: 20px !important;
+}
+
+/* Questions */
+.sd-question {
+  padding: 16px 0 !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+}
+.sd-question:last-child {
+  border-bottom: none !important;
+}
+
+.sd-question__title {
+  font-size: 0.9375rem !important;
+  font-weight: 600 !important;
+  color: #1f2937 !important;
+  line-height: 1.5 !important;
+}
+
+.sd-question__num {
+  color: #d97c2a !important;
+  font-weight: 700 !important;
+  margin-inline-end: 6px !important;
+}
+
+/* Radio group — make items large & touch-friendly */
+.sd-radio__decorator {
+  width: 22px !important;
+  height: 22px !important;
+  border-width: 2px !important;
+  border-color: #d1d5db !important;
+  transition: border-color 0.15s !important;
+}
+
+.sd-radio--checked .sd-radio__decorator {
+  border-color: #d97c2a !important;
   background-color: #d97c2a !important;
 }
 
-.sd-progress-bar {
+.sd-radio--checked .sd-radio__decorator::after {
+  width: 10px !important;
+  height: 10px !important;
+  background-color: #ffffff !important;
+}
+
+.sd-selectbase__label {
+  font-size: 0.9375rem !important;
+  color: #374151 !important;
+  padding-block: 2px !important;
+  cursor: pointer !important;
+}
+
+.sd-item {
+  padding: 10px 12px !important;
+  border-radius: 10px !important;
+  transition: background-color 0.1s !important;
+  margin-block: 2px !important;
+}
+
+.sd-item:hover {
+  background-color: #fdf2e6 !important;
+}
+
+.sd-item--checked {
+  background-color: #fdf2e6 !important;
+}
+
+/* Navigation buttons */
+.sd-navigation__complete-btn,
+.sd-navigation__next-btn,
+.sd-navigation__prev-btn {
   background-color: #d97c2a !important;
+  border-color: #d97c2a !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  font-size: 0.9375rem !important;
+  border-radius: 12px !important;
+  padding: 12px 28px !important;
+  transition: background-color 0.15s !important;
+  box-shadow: 0 2px 8px rgba(217, 124, 42, 0.25) !important;
+}
+
+.sd-navigation__complete-btn:hover,
+.sd-navigation__next-btn:hover {
+  background-color: #b5631c !important;
+  border-color: #b5631c !important;
+}
+
+.sd-navigation__prev-btn {
+  background-color: transparent !important;
+  border: 2px solid #e5e7eb !important;
+  color: #6b7280 !important;
+  box-shadow: none !important;
+}
+
+.sd-navigation__prev-btn:hover {
+  border-color: #d1d5db !important;
+  color: #374151 !important;
+}
+
+/* Progress bar */
+.sd-progress {
+  height: 4px !important;
+  background-color: #e5e7eb !important;
+  border-radius: 0 !important;
+}
+
+.sd-progress__bar {
+  background-color: #d97c2a !important;
+  border-radius: 0 !important;
+  transition: width 0.4s ease !important;
+}
+
+/* Page numbers in progress */
+.sd-progress-buttons__list-element--current .sd-progress-buttons__button {
+  background-color: #d97c2a !important;
+  border-color: #d97c2a !important;
+}
+
+.sd-progress-buttons__list-element--passed .sd-progress-buttons__button {
+  background-color: #d97c2a !important;
+  border-color: #d97c2a !important;
+}
+
+/* Validation error */
+.sd-question--error .sd-question__title {
+  color: #dc2626 !important;
+}
+
+.sv-string-viewer,
+.sd-error {
+  color: #dc2626 !important;
+  font-size: 0.8125rem !important;
+}
+
+/* RTL fixes for SurveyJS */
+[dir="rtl"] .sd-item__decorator,
+[dir="rtl"] .sd-radio__decorator {
+  margin-inline-end: 10px !important;
+  margin-inline-start: 0 !important;
+}
+
+[dir="rtl"] .sd-question__num {
+  margin-inline-end: 0 !important;
+  margin-inline-start: 6px !important;
+}
+
+/* Mobile-first responsive adjustments */
+@media (max-width: 640px) {
+  .sd-page {
+    padding: 16px !important;
+  }
+
+  .sd-navigation__complete-btn,
+  .sd-navigation__next-btn,
+  .sd-navigation__prev-btn {
+    width: 100% !important;
+    padding: 14px 20px !important;
+  }
+
+  .sd-question__title {
+    font-size: 0.9rem !important;
+  }
+}
+
+/* ── Print styles ─────────────────────────────────────────────────────────── */
+@media print {
+  header, footer, .print\:hidden, button { display: none !important; }
+  .print\:block { display: block !important; }
+  body { background: white !important; }
+  .bg-gradient-to-br, .bg-gradient-to-r {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }

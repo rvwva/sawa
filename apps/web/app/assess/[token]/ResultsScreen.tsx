@@ -1,158 +1,435 @@
 "use client";
 import { useEffect, useState } from "react";
-import ScoreBand from "@/components/ui/ScoreBand";
+import type { Lang } from "@/lib/i18n";
+import { useTranslations, translateBand } from "@/lib/i18n";
 import ScoreGauge from "@/components/ui/ScoreGauge";
+import BandCard from "@/components/ui/BandCard";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type SubscaleScore  = { score: number; band: string };
+type DimensionScore = { key: string; label: string; score: number; band: string };
+
+type Scores = {
+  // CBI
+  subscales?: Record<string, SubscaleScore>;
+  // PSS / WHO-5
+  total?: {
+    score: number;
+    band: string;
+    raw_score?: number;
+    depression_screen_recommended?: boolean;
+  };
+  // Culture
+  dimensions?: DimensionScore[];
+};
+
+type Comparison = {
+  [subscale: string]: { avg: number; band: string };
+};
 
 type Props = {
-  scores: Record<string, any>;
+  lang: Lang;
+  scores: Scores;
   sessionToken: string;
   assessmentType: string;
   assessmentName: string;
+  organisationName: string;
 };
 
-const BAND_COLORS: Record<string, string> = {
-  Low: "text-green-700 bg-green-50 border-green-200",
-  "Below Average": "text-yellow-700 bg-yellow-50 border-yellow-200",
-  Moderate: "text-orange-700 bg-orange-50 border-orange-200",
-  High: "text-red-700 bg-red-50 border-red-200",
-  "Needs Attention": "text-red-700 bg-red-50 border-red-200",
-  Developing: "text-orange-700 bg-orange-50 border-orange-200",
-  Healthy: "text-blue-700 bg-blue-50 border-blue-200",
-  Thriving: "text-green-700 bg-green-50 border-green-200",
-  Good: "text-green-700 bg-green-50 border-green-200",
-};
+// ─── Guidance map ────────────────────────────────────────────────────────────
 
-const BAND_MESSAGES: Record<string, string> = {
-  // Burnout / PSS
-  Low: "Your scores suggest you are managing well. Keep up healthy habits.",
-  Moderate:
-    "Your scores indicate a moderate level. Consider reviewing workload and recovery habits.",
-  High: "Your scores are elevated. We strongly recommend speaking with a healthcare professional or using your EAP.",
-  // WHO-5
-  "Below Average": "Your wellbeing score is below average. Consider speaking to someone you trust.",
-  Good: "Your wellbeing is in a good range. Keep nurturing your mental health.",
-  // Culture
-  "Needs Attention": "This dimension needs significant attention and focused improvement.",
-  Developing: "This dimension is developing — there is meaningful room for growth.",
-  Healthy: "This dimension is healthy — a good foundation to build on.",
-  Thriving: "This dimension is thriving — a real strength for your organisation.",
-};
+function getBurnoutGuidanceKey(band: string): string {
+  if (band === "Low")      return "guidance_burnout_low";
+  if (band === "Moderate") return "guidance_burnout_moderate";
+  return                          "guidance_burnout_high";
+}
+function getStressGuidanceKey(band: string): string {
+  if (band === "Low")      return "guidance_stress_low";
+  if (band === "Moderate") return "guidance_stress_moderate";
+  return                          "guidance_stress_high";
+}
+function getWho5GuidanceKey(band: string): string {
+  if (band === "Good")         return "guidance_who5_good";
+  if (band === "Moderate")     return "guidance_who5_moderate";
+  if (band === "Below Average") return "guidance_who5_below_avg";
+  return                               "guidance_who5_low";
+}
+function getCultureGuidanceKey(band: string): string {
+  if (band === "Thriving")        return "guidance_culture_thriving";
+  if (band === "Healthy")         return "guidance_culture_healthy";
+  if (band === "Developing")      return "guidance_culture_developing";
+  return                                 "guidance_culture_needs_attn";
+}
 
-export default function ResultsScreen({ scores, sessionToken, assessmentType, assessmentName }: Props) {
-  const [copied, setCopied] = useState(false);
+// ─── Mini score bar (for subscales / dimensions) ───────────────────────────
+
+function ScoreBar({
+  label,
+  score,
+  band,
+  lang,
+}: {
+  label: string;
+  score: number;
+  band: string;
+  lang: Lang;
+}) {
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const id = setTimeout(() => setWidth(score), 80);
+    return () => clearTimeout(id);
+  }, [score]);
+
+  const barColor =
+    score >= 68 ? "#16a34a"
+    : score >= 51 ? "#d97706"
+    : score >= 29 ? "#f59e0b"
+    : "#dc2626";
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm text-gray-700 font-medium leading-tight">{label}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <BandCard band={band} score={score} compact lang={lang} />
+          <span className="text-sm font-bold text-gray-800 w-12 text-right">
+            {Math.round(score)}<span className="text-gray-400 font-normal text-xs">/100</span>
+          </span>
+        </div>
+      </div>
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-700 ease-out"
+          style={{ width: `${width}%`, backgroundColor: barColor }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Comparison row ───────────────────────────────────────────────────────────
+
+function ComparisonRow({
+  label,
+  myScore,
+  orgAvg,
+  deptAvg,
+  t,
+  lang,
+}: {
+  label: string;
+  myScore: number;
+  orgAvg: number | null;
+  deptAvg: number | null;
+  t: ReturnType<typeof useTranslations>;
+  lang: Lang;
+}) {
+  const items = [
+    { label: t("results_my_score"),  score: myScore,        color: "#d97c2a" },
+    { label: t("results_org_avg"),   score: orgAvg,         color: "#6b7280" },
+    ...(deptAvg != null
+      ? [{ label: t("results_dept_avg"), score: deptAvg, color: "#5e875e" }]
+      : []),
+  ].filter((x) => x.score != null) as { label: string; score: number; color: string }[];
+
+  return (
+    <div className="space-y-1.5 py-3 border-b border-gray-50 last:border-0">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+      <div className="space-y-1.5">
+        {items.map((item) => (
+          <div key={item.label} className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 w-32 shrink-0">{item.label}</span>
+            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${item.score}%`, backgroundColor: item.color }}
+              />
+            </div>
+            <span className="text-xs font-bold text-gray-700 w-8 text-right">
+              {Math.round(item.score)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function ResultsScreen({
+  lang,
+  scores,
+  sessionToken,
+  assessmentType,
+  assessmentName,
+  organisationName,
+}: Props) {
+  const t = useTranslations(lang);
+  const [copied, setCopied]           = useState(false);
+  const [comparison, setComparison]   = useState<Comparison | null>(null);
+  const [deptComparison, setDeptComparison] = useState<Comparison | null>(null);
+  const [showToken, setShowToken]     = useState(false);
+
+  // Fetch comparison data (org avg + dept avg)
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/responses/my-score/${sessionToken}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.orgAverage)  setComparison(data.orgAverage);
+        if (data?.departmentAverage) setDeptComparison(data.departmentAverage);
+      })
+      .catch(() => {});
+  }, [sessionToken]);
 
   function copyToken() {
-    navigator.clipboard.writeText(sessionToken);
+    navigator.clipboard.writeText(sessionToken).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const total = scores.total;
-  const subscales = scores.subscales;
-  const dimensions = scores.dimensions;
-  const depressionScreen = total?.depression_screen_recommended;
+  function handlePrint() {
+    window.print();
+  }
+
+  // ── Derive overall score and band ─────────────────────────────────────────
+
+  const overall = scores.total;
+  const overallScore = overall?.score ?? null;
+  const overallBand  = overall?.band  ?? null;
+
+  // Guidance text based on type + band
+  const guidanceKey: string | null =
+    !overallBand ? null
+    : assessmentType === "CBI"     ? getBurnoutGuidanceKey(overallBand)
+    : assessmentType === "PSS"     ? getStressGuidanceKey(overallBand)
+    : assessmentType === "WHO5"    ? getWho5GuidanceKey(overallBand)
+    : assessmentType === "CULTURE" ? getCultureGuidanceKey(overallBand)
+    : null;
+
+  const guidance = guidanceKey ? t(guidanceKey as any) : null;
+
+  const hasCBISubscales  = !!scores.subscales && Object.keys(scores.subscales).length > 0;
+  const hasDimensions    = (scores.dimensions?.length ?? 0) > 0;
+  const hasComparison    = comparison && Object.keys(comparison).length > 0;
+
+  // Subscale label translations (English fallback)
+  const subscaleLabels: Record<string, Record<Lang, string>> = {
+    personal_burnout: { en: "Personal Burnout",       ar: "الإرهاق الشخصي" },
+    work_burnout:     { en: "Work-Related Burnout",    ar: "الإرهاق المرتبط بالعمل" },
+    client_burnout:   { en: "Client-Related Burnout",  ar: "الإرهاق المرتبط بالعملاء" },
+    total:            { en: "Overall",                 ar: "الإجمالي" },
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Header card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className="space-y-4 animate-fade-in print:space-y-6">
+
+      {/* ── Print header (hidden on screen) ──────────────────── */}
+      <div className="hidden print:block mb-4">
+        <h1 className="text-2xl font-bold">{t("print_title")}</h1>
+        <p className="text-sm text-gray-600">
+          {t("print_org")}: {organisationName} ·{" "}
+          {t("print_date")}: {new Date().toLocaleDateString(lang === "ar" ? "ar-SA" : "en-SA")}
+        </p>
+        <p className="text-sm text-gray-600">{assessmentName}</p>
+        <hr className="my-3" />
+      </div>
+
+      {/* ── Success badge + overall ──────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-brand-500 to-brand-600 px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Your Results</h1>
-            <p className="text-gray-500 mt-1">{assessmentName}</p>
+            <h1 className="text-white text-xl font-bold">{t("results_title")}</h1>
+            <p className="text-brand-100 text-sm mt-0.5">{assessmentName}</p>
           </div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 text-sm font-medium border border-green-200">
-            ✓ Submitted
+          <span className="inline-flex items-center gap-1.5 bg-white/20 text-white text-xs font-medium px-3 py-1.5 rounded-full">
+            <span>✓</span> {t("results_submitted")}
           </span>
         </div>
 
-        {/* Overall score */}
-        {total && (
-          <div className="mt-6 flex flex-col sm:flex-row items-center gap-6">
-            <ScoreGauge score={total.score} />
-            <div>
-              <div
-                className={`inline-flex items-center px-4 py-1.5 rounded-full border font-semibold text-sm ${
-                  BAND_COLORS[total.band] ?? "text-gray-700 bg-gray-50 border-gray-200"
-                }`}
-              >
-                {total.band}
-              </div>
-              <p className="mt-2 text-sm text-gray-600 max-w-md">
-                {BAND_MESSAGES[total.band] ?? ""}
-              </p>
-              {depressionScreen && (
-                <p className="mt-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                  ⚠ Your WHO-5 score suggests possible depression. Please consult a healthcare
-                  professional.
+        <div className="px-6 py-6">
+          {overallScore !== null && overallBand ? (
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+              <div className="shrink-0">
+                <p className="text-xs text-gray-500 font-medium text-center mb-2">
+                  {t("results_overall")}
                 </p>
-              )}
+                <ScoreGauge score={overallScore} size={150} animate />
+              </div>
+              <div className="flex-1 w-full">
+                {guidance && (
+                  <BandCard
+                    band={overallBand}
+                    score={overallScore}
+                    guidance={guidance}
+                    lang={lang}
+                  />
+                )}
+                {/* WHO-5 depression screen alert */}
+                {assessmentType === "WHO5" && overall?.depression_screen_recommended && (
+                  <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                    <p className="text-sm text-red-800 font-medium leading-relaxed">
+                      {lang === "ar"
+                        ? "⚠ تشير درجتك إلى احتمال وجود اكتئاب. يُرجى استشارة متخصص في الرعاية الصحية."
+                        : "⚠ Your WHO-5 score suggests possible depression. Please consult a healthcare professional."}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-gray-500 text-sm">
+              {lang === "ar" ? "لا توجد نتائج متاحة." : "No scores available."}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* CBI subscales */}
-      {subscales && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-800 mb-4">Subscale Breakdown</h2>
+      {/* ── CBI subscales ────────────────────────────────────── */}
+      {hasCBISubscales && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-5">
+          <h2 className="font-bold text-gray-900 mb-4">{t("results_subscales")}</h2>
           <div className="space-y-4">
-            {Object.entries<any>(subscales).map(([key, val]) => (
-              <ScoreBand
-                key={key}
-                label={key
-                  .replace(/_/g, " ")
-                  .replace(/\b\w/g, (c) => c.toUpperCase())}
-                score={val.score}
-                band={val.band}
-                bandColors={BAND_COLORS}
-              />
-            ))}
+            {Object.entries(scores.subscales!).map(([key, val]) => {
+              const label =
+                subscaleLabels[key]?.[lang] ??
+                key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+              return (
+                <ScoreBar
+                  key={key}
+                  label={label}
+                  score={val.score}
+                  band={val.band}
+                  lang={lang}
+                />
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Culture dimensions */}
-      {dimensions && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <h2 className="font-semibold text-gray-800 mb-4">Culture Dimensions</h2>
+      {/* ── Culture dimensions ───────────────────────────────── */}
+      {hasDimensions && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-5">
+          <h2 className="font-bold text-gray-900 mb-4">{t("results_dimensions")}</h2>
           <div className="space-y-4">
-            {(dimensions as any[]).map((dim) => (
-              <ScoreBand
+            {scores.dimensions!.map((dim) => (
+              <ScoreBar
                 key={dim.key}
                 label={dim.label}
                 score={dim.score}
                 band={dim.band}
-                bandColors={BAND_COLORS}
+                lang={lang}
               />
             ))}
           </div>
         </div>
       )}
 
-      {/* Session token / data rights */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <h2 className="font-semibold text-gray-800 mb-2">Your Data Rights</h2>
-        <p className="text-sm text-gray-600 mb-3">
-          Save your session token below. You can use it at any time to access or delete your data.
-        </p>
-        <div className="flex items-center gap-2">
-          <code className="flex-1 bg-gray-100 rounded-lg px-3 py-2 text-xs text-gray-700 break-all">
-            {sessionToken}
-          </code>
-          <button
-            onClick={copyToken}
-            className="shrink-0 px-3 py-2 rounded-lg bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 transition-colors"
-          >
-            {copied ? "Copied!" : "Copy"}
-          </button>
+      {/* ── Comparison ───────────────────────────────────────── */}
+      {hasComparison && overallScore !== null && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-5">
+          <h2 className="font-bold text-gray-900 mb-1">{t("results_comparison")}</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            {lang === "ar"
+              ? "تُعرض نتائج الأقسام فقط عند مشاركة 5 أشخاص أو أكثر."
+              : "Department averages shown only when 5+ people respond."}
+          </p>
+          <ComparisonRow
+            label={t("results_overall")}
+            myScore={overallScore}
+            orgAvg={comparison!["total"]?.avg ?? null}
+            deptAvg={deptComparison?.["total"]?.avg ?? null}
+            t={t}
+            lang={lang}
+          />
         </div>
+      )}
+
+      {/* ── Disclaimer ───────────────────────────────────────── */}
+      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+        <p className="text-xs text-gray-500 leading-relaxed">{t("results_disclaimer")}</p>
       </div>
 
-      <p className="text-center text-xs text-gray-400 pb-4">
-        This assessment was administered by Sawa. Results are for personal awareness only and do not
-        constitute medical advice.
-      </p>
+      {/* ── Actions (download + token) ───────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-5 space-y-4">
+        {/* Download */}
+        <button
+          onClick={handlePrint}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-brand-200 text-brand-600 font-semibold text-sm hover:bg-brand-50 transition-colors print:hidden"
+        >
+          <span aria-hidden>⬇</span> {t("download")}
+        </button>
+
+        {/* Session token */}
+        <div>
+          <button
+            onClick={() => setShowToken(!showToken)}
+            className="w-full flex items-center justify-between py-3 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+          >
+            <span>{t("results_token_title")}</span>
+            <span className="text-gray-400">{showToken ? "▲" : "▼"}</span>
+          </button>
+
+          {showToken && (
+            <div className="pt-2 space-y-3">
+              <p className="text-xs text-gray-500 leading-relaxed">
+                {t("results_token_desc")}
+              </p>
+              <div className="flex items-stretch gap-2">
+                <code className="flex-1 bg-gray-100 rounded-lg px-3 py-2.5 text-xs text-gray-700 font-mono break-all leading-relaxed">
+                  {sessionToken}
+                </code>
+                <button
+                  onClick={copyToken}
+                  className="shrink-0 px-3 rounded-lg bg-brand-500 text-white text-xs font-semibold hover:bg-brand-600 transition-colors"
+                >
+                  {copied ? t("copied") : t("copy")}
+                </button>
+              </div>
+
+              <div className="flex gap-2">
+                <a
+                  href={`${process.env.NEXT_PUBLIC_API_URL}/data-rights/access`}
+                  className="flex-1 text-center py-2 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    alert(lang === "ar"
+                      ? `أرسل رمز جلستك إلى الدعم:\n${sessionToken}`
+                      : `Send your session token to support:\n${sessionToken}`);
+                  }}
+                >
+                  {t("results_access_data")}
+                </a>
+                <a
+                  href={`${process.env.NEXT_PUBLIC_API_URL}/data-rights/delete`}
+                  className="flex-1 text-center py-2 rounded-lg border border-red-200 text-xs text-red-600 hover:bg-red-50 transition-colors"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const confirmed = window.confirm(
+                      lang === "ar"
+                        ? "هل أنت متأكد من رغبتك في حذف جميع بياناتك؟ لا يمكن التراجع عن هذا الإجراء."
+                        : "Are you sure you want to delete all your data? This cannot be undone."
+                    );
+                    if (confirmed) {
+                      fetch(`${process.env.NEXT_PUBLIC_API_URL}/data-rights/delete`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ sessionToken }),
+                      }).then(() =>
+                        alert(lang === "ar" ? "تم حذف بياناتك." : "Your data has been deleted.")
+                      );
+                    }
+                  }}
+                >
+                  {t("results_delete_data")}
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

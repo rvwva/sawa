@@ -292,6 +292,10 @@ assessmentsRouter.patch(
 );
 
 // GET /api/assessments/cycles/by-token/:token — anonymous employee resolves cycle via link token
+// GET /api/assessments/cycles/by-token/:token
+// Public — resolves cycle info from the anonymous employee link token.
+// Returns assessment metadata, org branding, and the org's departments
+// (so the frontend can render the optional department selector step).
 assessmentsRouter.get(
   "/cycles/by-token/:token",
   async (req: Request, res: Response) => {
@@ -301,7 +305,18 @@ assessmentsRouter.get(
         assessment: {
           select: { type: true, name: true, nameAr: true, description: true, itemCount: true },
         },
-        organisation: { select: { name: true, nameAr: true, logoUrl: true } },
+        organisation: {
+          select: {
+            id: true,
+            name: true,
+            nameAr: true,
+            logoUrl: true,
+            departments: {
+              select: { id: true, name: true, nameAr: true },
+              orderBy: { name: "asc" },
+            },
+          },
+        },
       },
     });
 
@@ -313,12 +328,15 @@ assessmentsRouter.get(
       return res.status(410).json({ error: "This assessment has expired" });
     }
 
+    const { departments, ...orgWithoutDepts } = cycle.organisation;
+
     return res.json({
       cycleId: cycle.id,
       title: cycle.title,
       endsAt: cycle.endsAt,
       assessment: cycle.assessment,
-      organisation: cycle.organisation,
+      organisation: orgWithoutDepts,
+      departments,   // array of { id, name, nameAr } — empty if org has none
     });
   }
 );

@@ -1,58 +1,97 @@
 "use client";
+import { useEffect, useState } from "react";
 
 type Props = {
-  score: number;  // 0–100
+  score: number;   // 0–100
   size?: number;
+  label?: string;
+  animate?: boolean;
 };
 
-export default function ScoreGauge({ score, size = 120 }: Props) {
-  const r = 45;
-  const cx = 60;
-  const cy = 60;
-  const circumference = Math.PI * r;  // half-circle
-  const dash = (score / 100) * circumference;
-  const gap = circumference - dash;
+function scoreColor(score: number): string {
+  if (score >= 68) return "#16a34a";   // green
+  if (score >= 51) return "#d97706";   // amber
+  if (score >= 29) return "#f59e0b";   // yellow-amber
+  return "#dc2626";                    // red
+}
 
-  const color =
-    score >= 68 ? "#5e875e" :
-    score >= 51 ? "#e09548" :
-    score >= 29 ? "#f59e0b" :
-    "#ef4444";
+export default function ScoreGauge({ score, size = 140, label, animate = true }: Props) {
+  const [displayed, setDisplayed] = useState(animate ? 0 : score);
+
+  useEffect(() => {
+    if (!animate) { setDisplayed(score); return; }
+    let start = 0;
+    const step = score / 40;
+    const id = setInterval(() => {
+      start += step;
+      if (start >= score) { setDisplayed(score); clearInterval(id); }
+      else setDisplayed(Math.round(start));
+    }, 20);
+    return () => clearInterval(id);
+  }, [score, animate]);
+
+  const r = 52;
+  const cx = 70;
+  const cy = 68;
+  const circumference = Math.PI * r;          // half-circle arc length
+  const dash = (displayed / 100) * circumference;
+  const gap  = circumference - dash;
+  const color = scoreColor(score);
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center gap-1">
       <svg
         width={size}
-        height={size * 0.6}
-        viewBox="0 0 120 75"
+        height={size * 0.62}
+        viewBox="0 0 140 90"
         className="overflow-visible"
+        aria-label={`Score ${Math.round(score)} out of 100`}
+        role="img"
       >
-        {/* Background arc */}
+        {/* Track */}
         <path
-          d={`M 15 60 A 45 45 0 0 1 105 60`}
+          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
           fill="none"
           stroke="#e5e7eb"
-          strokeWidth="10"
+          strokeWidth="12"
           strokeLinecap="round"
         />
         {/* Score arc */}
         <path
-          d={`M 15 60 A 45 45 0 0 1 105 60`}
+          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
           fill="none"
           stroke={color}
-          strokeWidth="10"
+          strokeWidth="12"
           strokeLinecap="round"
           strokeDasharray={`${dash} ${gap}`}
-          style={{ transition: "stroke-dasharray 1s ease" }}
+          style={{ transition: animate ? "stroke-dasharray 0.8s cubic-bezier(.4,0,.2,1)" : "none" }}
         />
-        {/* Score text */}
-        <text x="60" y="58" textAnchor="middle" fontSize="22" fontWeight="700" fill="#111827">
-          {Math.round(score)}
+        {/* Score number */}
+        <text
+          x={cx}
+          y={cy - 4}
+          textAnchor="middle"
+          fontSize="30"
+          fontWeight="800"
+          fill="#111827"
+          fontFamily="Inter, system-ui, sans-serif"
+        >
+          {Math.round(displayed)}
         </text>
-        <text x="60" y="72" textAnchor="middle" fontSize="9" fill="#6b7280">
-          out of 100
+        <text
+          x={cx}
+          y={cy + 14}
+          textAnchor="middle"
+          fontSize="11"
+          fill="#9ca3af"
+          fontFamily="Inter, system-ui, sans-serif"
+        >
+          / 100
         </text>
       </svg>
+      {label && (
+        <p className="text-xs text-gray-500 font-medium text-center">{label}</p>
+      )}
     </div>
   );
 }
