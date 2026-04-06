@@ -1,8 +1,12 @@
 /**
  * Sawa Email Service — SendGrid
  * ================================
- * All transactional emails sent by the platform.
- * Templates are inline HTML; in production swap for SendGrid dynamic templates.
+ * Professional bilingual (English / Arabic) transactional emails via SendGrid.
+ * All four notification types:
+ *   1. Cycle invitation  — sent to employees when a cycle is activated
+ *   2. Reminder          — sent 3 days and 1 day before deadline (via scheduler)
+ *   3. Cycle closed      — sent to exec/HR with headline metrics
+ *   4. Team pulse        — sent to all participants when results are published
  */
 
 import sgMail from "@sendgrid/mail";
@@ -11,270 +15,551 @@ import { logger } from "../lib/logger";
 sgMail.setApiKey(process.env.SENDGRID_API_KEY ?? "");
 
 const FROM = {
-  email: process.env.EMAIL_FROM ?? "noreply@sawa.app",
-  name: process.env.EMAIL_FROM_NAME ?? "Sawa Platform",
+  email: process.env.EMAIL_FROM      ?? "noreply@sawa.app",
+  name:  process.env.EMAIL_FROM_NAME ?? "Sawa Platform",
 };
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Parameter interfaces ─────────────────────────────────────────────────────
 
 export interface CycleInviteParams {
-  recipientEmails: string[];   // HR distributes to employees
+  recipientEmails:  string[];
   organisationName: string;
-  assessmentName: string;
-  cycleTitle: string;
-  assessmentUrl: string;       // full URL with link token
-  endsAt: Date;
+  organisationNameAr?: string;
+  assessmentName:   string;
+  assessmentNameAr?: string;
+  cycleTitle:       string;
+  assessmentUrl:    string;
+  endsAt:           Date;
 }
 
 export interface CycleReminderParams extends CycleInviteParams {
-  daysRemaining: number;
+  daysRemaining: number;   // 3 or 1
 }
 
 export interface CycleClosedParams {
-  recipientEmail: string;
+  recipientEmail:   string;
+  recipientName?:   string;
   organisationName: string;
-  cycleTitle: string;
-  assessmentName: string;
-  respondentCount: number;
-  dashboardUrl: string;
+  organisationNameAr?: string;
+  cycleTitle:       string;
+  assessmentName:   string;
+  assessmentNameAr?: string;
+  respondentCount:  number;
+  avgScore:         number | null;
+  topDimension?:    string;
+  lowestDimension?: string;
+  dashboardUrl:     string;
+}
+
+export interface TeamPulseParams {
+  recipientEmails:  string[];
+  organisationName: string;
+  organisationNameAr?: string;
+  cycleTitle:       string;
+  assessmentName:   string;
+  assessmentNameAr?: string;
 }
 
 export interface WeeklyReportParams {
-  recipientEmail: string;
-  recipientName: string;
+  recipientEmail:   string;
+  recipientName:    string;
   organisationName: string;
-  periodLabel: string;          // e.g. "Week of 1–7 April 2026"
-  dashboardUrl: string;
+  periodLabel:      string;
+  dashboardUrl:     string;
   highlights: {
     totalRespondents: number;
-    avgScore: number | null;
-    topDimension?: string;
+    avgScore:         number | null;
+    topDimension?:    string;
     lowestDimension?: string;
   };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Date helpers ─────────────────────────────────────────────────────────────
 
-function formatDate(d: Date): string {
+function fmtEn(d: Date): string {
   return d.toLocaleDateString("en-SA", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+    year: "numeric", month: "long", day: "numeric",
     timeZone: "Asia/Riyadh",
   });
 }
 
-function htmlWrapper(title: string, body: string): string {
+function fmtAr(d: Date): string {
+  return d.toLocaleDateString("ar-SA", {
+    year: "numeric", month: "long", day: "numeric",
+    timeZone: "Asia/Riyadh",
+  });
+}
+
+// ─── Shared CSS ───────────────────────────────────────────────────────────────
+
+const CSS = `
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+       background:#f0f2f5;color:#111827;-webkit-font-smoothing:antialiased}
+  .w{max-width:600px;margin:24px auto;background:#fff;border-radius:20px;
+     overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.10)}
+  .hdr{background:linear-gradient(135deg,#d97c2a 0%,#a85a14 100%);
+       padding:36px 40px;text-align:center}
+  .hdr-logo{color:#fff;font-size:28px;font-weight:800;letter-spacing:-.5px}
+  .hdr-sub{color:rgba(255,255,255,.80);font-size:12px;margin-top:8px;line-height:1.6}
+  .en{padding:32px 40px 20px}
+  .en p{line-height:1.75;color:#374151;margin-bottom:14px;font-size:15px}
+  .ar{padding:28px 40px 24px;background:#fafafa;
+      border-top:2px dashed #e5e7eb;
+      direction:rtl;font-family:'Noto Sans Arabic',Tahoma,Arial,sans-serif}
+  .ar p{line-height:2;color:#374151;margin-bottom:14px;font-size:15px}
+  .cta-row{text-align:center;padding:6px 0 22px}
+  .cta{display:inline-block;background:#d97c2a;color:#fff !important;
+       text-decoration:none;padding:14px 36px;border-radius:12px;
+       font-weight:700;font-size:15px;letter-spacing:.1px}
+  .cta:hover{background:#b85f1a}
+  .badge{display:inline-block;background:#fef3c7;border:1px solid #f59e0b;
+         border-radius:8px;padding:10px 16px;font-size:13px;color:#92400e;
+         margin:6px 0 18px;width:100%}
+  .badge-ar{display:inline-block;background:#fef3c7;border:1px solid #f59e0b;
+            border-radius:8px;padding:10px 16px;font-size:13px;color:#92400e;
+            margin:6px 0 18px;width:100%;
+            font-family:'Noto Sans Arabic',Tahoma,Arial,sans-serif}
+  .stats{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;
+         padding:8px 0 22px}
+  .stat{background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;
+        padding:18px 26px;text-align:center;min-width:110px}
+  .sv{font-size:36px;font-weight:800;color:#d97c2a;line-height:1}
+  .sl{font-size:11px;color:#6b7280;margin-top:6px;font-weight:500}
+  .sl-ar{font-size:11px;color:#6b7280;margin-top:6px;font-weight:500;
+         font-family:'Noto Sans Arabic',Tahoma,Arial,sans-serif}
+  .dim{background:#f3f4f6;border-radius:8px;padding:10px 16px;
+       font-size:13px;color:#374151;margin:4px 0 16px}
+  .dim-ar{background:#f3f4f6;border-radius:8px;padding:10px 16px;
+          font-size:13px;color:#374151;margin:4px 0 16px;
+          font-family:'Noto Sans Arabic',Tahoma,Arial,sans-serif;direction:rtl}
+  .mute{font-size:12px;color:#9ca3af;line-height:1.7;margin-top:8px}
+  .link{font-size:12px;color:#9ca3af;word-break:break-all;margin-top:6px}
+  .ftr{padding:20px 40px;text-align:center;font-size:11px;color:#9ca3af;
+       line-height:1.9;border-top:1px solid #f3f4f6}
+  .urgent-bar{background:#fef2f2;border-top:3px solid #f87171;
+              padding:12px 40px;text-align:center;
+              font-size:13px;font-weight:600;color:#b91c1c}
+`;
+
+// ─── HTML wrapper ─────────────────────────────────────────────────────────────
+
+function html(title: string, body: string): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
   <title>${title}</title>
-  <style>
-    body { font-family: Inter, Arial, sans-serif; margin:0; padding:0; background:#f9fafb; color:#111827; }
-    .container { max-width:600px; margin:32px auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.08); }
-    .header { background:#d97c2a; padding:28px 32px; }
-    .header h1 { color:#fff; margin:0; font-size:24px; font-weight:700; }
-    .header p { color:rgba(255,255,255,.85); margin:4px 0 0; font-size:14px; }
-    .body { padding:32px; }
-    .body p { line-height:1.7; color:#374151; margin:0 0 16px; }
-    .cta { display:inline-block; background:#d97c2a; color:#fff !important; text-decoration:none; padding:14px 28px; border-radius:10px; font-weight:600; font-size:15px; margin:8px 0 24px; }
-    .footer { padding:20px 32px; border-top:1px solid #f3f4f6; font-size:12px; color:#9ca3af; }
-    .stat { display:inline-block; background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:12px 20px; margin:6px; text-align:center; }
-    .stat-value { font-size:28px; font-weight:700; color:#d97c2a; }
-    .stat-label { font-size:12px; color:#6b7280; margin-top:4px; }
-    .notice { background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:12px 16px; font-size:13px; color:#92400e; margin:16px 0; }
-  </style>
+  <style>${CSS}</style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>Sawa · سواء</h1>
-      <p>Workplace Culture & People Intelligence</p>
+  <div class="w">
+    <div class="hdr">
+      <div class="hdr-logo">Sawa &middot; سواء</div>
+      <div class="hdr-sub">
+        Workplace Culture &amp; People Intelligence<br>
+        ثقافة بيئة العمل والذكاء البشري
+      </div>
     </div>
-    <div class="body">${body}</div>
-    <div class="footer">
-      © Sawa Platform · Riyadh, Saudi Arabia<br>
-      This message is confidential and intended only for the named recipient.
+    ${body}
+    <div class="ftr">
+      &copy; Sawa Platform &middot; Riyadh, Saudi Arabia &middot; الرياض، المملكة العربية السعودية<br>
+      This email is confidential and intended only for the named recipient.<br>
+      هذه الرسالة سرية وموجهة للمستلم المحدد فقط.
     </div>
   </div>
 </body>
 </html>`;
 }
 
-// ─── Email senders ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. CYCLE INVITATION
+// ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Send assessment invitations to a list of employee emails.
- * Each recipient gets their own email (BCC not used — each may be unique in future).
- */
 export async function sendCycleInvite(params: CycleInviteParams): Promise<void> {
-  const body = `
-    <p>Hi there,</p>
-    <p>
-      <strong>${params.organisationName}</strong> has launched a new assessment:
-      <strong>${params.cycleTitle}</strong>.
-    </p>
-    <p>
-      This is an anonymous ${params.assessmentName} — your responses cannot be linked
-      back to you individually. The assessment takes approximately 5–10 minutes to complete.
-    </p>
-    <div class="notice">
-      📅 <strong>Deadline:</strong> ${formatDate(params.endsAt)}
-    </div>
-    <a href="${params.assessmentUrl}" class="cta">Start Assessment →</a>
-    <p style="font-size:13px;color:#6b7280;">
-      If the button doesn't work, copy and paste this link into your browser:<br>
-      <span style="color:#d97c2a;">${params.assessmentUrl}</span>
-    </p>
-    <p>
-      Your participation helps build a healthier workplace for everyone.
-      Participation is completely voluntary.
-    </p>
-  `;
+  const orgEn = params.organisationName;
+  const orgAr = params.organisationNameAr ?? params.organisationName;
+  const asmEn = params.assessmentName;
+  const asmAr = params.assessmentNameAr ?? params.assessmentName;
 
+  const body = `
+    <div class="en">
+      <p>Hi there,</p>
+      <p>
+        <strong>${orgEn}</strong> is inviting you to complete the
+        <strong>${params.cycleTitle}</strong> assessment.
+      </p>
+      <p>
+        This is an anonymous <strong>${asmEn}</strong> that helps your organisation
+        understand workplace wellbeing and culture. Your individual responses are
+        completely confidential — results are only shown as group statistics.
+        The assessment takes approximately 5–10 minutes.
+      </p>
+      <div class="badge">
+        &#128197;&ensp;<strong>Deadline:</strong>&ensp;${fmtEn(params.endsAt)}
+      </div>
+      <div class="cta-row">
+        <a class="cta" href="${params.assessmentUrl}">Start Assessment &rarr;</a>
+      </div>
+      <p class="link">
+        If the button doesn't work, paste this link into your browser:<br>
+        ${params.assessmentUrl}
+      </p>
+      <p class="mute">
+        Your participation is anonymous and entirely voluntary.
+        Thank you for helping build a healthier workplace.
+      </p>
+    </div>
+
+    <div class="ar">
+      <p>مرحباً،</p>
+      <p>
+        تدعوك <strong>${orgAr}</strong> لإكمال تقييم
+        <strong>${params.cycleTitle}</strong>.
+      </p>
+      <p>
+        هذا تقييم مجهول الهوية (<strong>${asmAr}</strong>) يساعد مؤسستك على فهم
+        الرفاهية وثقافة بيئة العمل. ردودك الفردية سرية تماماً — تُعرض النتائج
+        كإحصاءات جماعية فقط. يستغرق التقييم نحو 5–10 دقائق.
+      </p>
+      <div class="badge-ar">
+        &#128197;&ensp;<strong>الموعد النهائي:</strong>&ensp;${fmtAr(params.endsAt)}
+      </div>
+      <div class="cta-row">
+        <a class="cta" href="${params.assessmentUrl}">ابدأ التقييم &larr;</a>
+      </div>
+      <p class="mute" style="direction:rtl;text-align:right">
+        مشاركتك مجهولة الهوية وطوعية تماماً.
+        شكراً لمساهمتك في بناء بيئة عمل أكثر صحةً وإنتاجية.
+      </p>
+    </div>`;
+
+  const subject = `Action required: ${params.cycleTitle} — ${orgEn}`;
   const messages = params.recipientEmails.map((to) => ({
     to,
     from: FROM,
-    subject: `Action required: ${params.cycleTitle} — ${params.organisationName}`,
-    html: htmlWrapper(`${params.cycleTitle} — Assessment Invitation`, body),
+    subject,
+    html: html(`${params.cycleTitle} — Assessment Invitation`, body),
   }));
 
   try {
     await sgMail.send(messages as any);
-    logger.info(`Cycle invite sent to ${messages.length} recipients`, {
-      cycleTitle: params.cycleTitle,
-    });
+    logger.info(`Invite sent to ${messages.length} recipients`, { cycleTitle: params.cycleTitle });
   } catch (err) {
-    logger.error("Failed to send cycle invite emails", { err });
+    logger.error("sendCycleInvite failed", { err });
     throw err;
   }
 }
 
-/**
- * Reminder email sent N days before the cycle closes.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. REMINDER (3-day and 1-day)
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function sendCycleReminder(params: CycleReminderParams): Promise<void> {
+  const isUrgent  = params.daysRemaining === 1;
+  const orgEn     = params.organisationName;
+  const orgAr     = params.organisationNameAr ?? params.organisationName;
+
+  const enTimeMsg = isUrgent
+    ? "closes <strong>tomorrow</strong>"
+    : `closes in <strong>${params.daysRemaining} days</strong>`;
+  const arTimeMsg = isUrgent
+    ? "تنتهي <strong>غداً</strong>"
+    : `تنتهي خلال <strong>${params.daysRemaining} أيام</strong>`;
+
+  const urgentBar = isUrgent
+    ? `<div class="urgent-bar">&#9888;&ensp;Final reminder — closes tomorrow · تذكير أخير — تنتهي غداً</div>`
+    : "";
+
   const body = `
-    <p>Hi there,</p>
-    <p>
-      A friendly reminder: the <strong>${params.cycleTitle}</strong> assessment at
-      <strong>${params.organisationName}</strong> closes in
-      <strong>${params.daysRemaining} day${params.daysRemaining !== 1 ? "s" : ""}</strong>.
-    </p>
-    <div class="notice">
-      ⏰ <strong>Deadline:</strong> ${formatDate(params.endsAt)}
+    ${urgentBar}
+    <div class="en">
+      <p>Hi there,</p>
+      <p>
+        Just a reminder: the <strong>${params.cycleTitle}</strong> assessment at
+        <strong>${orgEn}</strong> ${enTimeMsg}.
+      </p>
+      <div class="badge">
+        &#9200;&ensp;<strong>${isUrgent ? "Final deadline" : "Deadline"}:</strong>
+        &ensp;${fmtEn(params.endsAt)}
+      </div>
+      <p>
+        If you haven't completed it yet, please take a few minutes before it closes.
+        The assessment is anonymous and takes approximately 5–10 minutes.
+      </p>
+      <div class="cta-row">
+        <a class="cta" href="${params.assessmentUrl}">Complete Assessment &rarr;</a>
+      </div>
+      <p class="mute">Your participation is anonymous and voluntary.</p>
     </div>
-    <p>If you haven't already responded, please take a few minutes to complete it.</p>
-    <a href="${params.assessmentUrl}" class="cta">Complete Assessment →</a>
-    <p style="font-size:13px;color:#6b7280;">
-      Your participation is anonymous and voluntary.
-    </p>
-  `;
+
+    <div class="ar">
+      <p>مرحباً،</p>
+      <p>
+        تذكير: تقييم <strong>${params.cycleTitle}</strong> في
+        <strong>${orgAr}</strong> ${arTimeMsg}.
+      </p>
+      <div class="badge-ar">
+        &#9200;&ensp;<strong>${isUrgent ? "الموعد النهائي" : "الموعد النهائي"}:</strong>
+        &ensp;${fmtAr(params.endsAt)}
+      </div>
+      <p>
+        إذا لم تُكمل التقييم بعد، يُرجى تخصيص بضع دقائق قبل انتهاء المهلة.
+        التقييم مجهول الهوية ويستغرق نحو 5–10 دقائق.
+      </p>
+      <div class="cta-row">
+        <a class="cta" href="${params.assessmentUrl}">أكمل التقييم &larr;</a>
+      </div>
+      <p class="mute" style="direction:rtl;text-align:right">
+        مشاركتك مجهولة الهوية وطوعية تماماً.
+      </p>
+    </div>`;
+
+  const dayLabel = isUrgent ? "tomorrow" : `${params.daysRemaining} days`;
+  const subject  = `Reminder: ${params.cycleTitle} closes in ${dayLabel} — ${orgEn}`;
 
   const messages = params.recipientEmails.map((to) => ({
     to,
     from: FROM,
-    subject: `Reminder: ${params.cycleTitle} closes in ${params.daysRemaining} day${params.daysRemaining !== 1 ? "s" : ""}`,
-    html: htmlWrapper("Assessment Reminder", body),
+    subject,
+    html: html("Assessment Reminder · تذكير بالتقييم", body),
   }));
 
   try {
     await sgMail.send(messages as any);
-    logger.info(`Cycle reminder sent to ${messages.length} recipients`);
+    logger.info(`Reminder (${params.daysRemaining}d) sent to ${messages.length} recipients`);
   } catch (err) {
-    logger.error("Failed to send reminder emails", { err });
+    logger.error("sendCycleReminder failed", { err });
     throw err;
   }
 }
 
-/**
- * Notification to HR/Executive when a cycle closes — links to results dashboard.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. CYCLE CLOSED — executive/HR notification with headline metrics
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function sendCycleClosedNotification(params: CycleClosedParams): Promise<void> {
+  const orgEn  = params.organisationName;
+  const orgAr  = params.organisationNameAr ?? params.organisationName;
+  const asmEn  = params.assessmentName;
+  const asmAr  = params.assessmentNameAr  ?? params.assessmentName;
+  const name   = params.recipientName ?? "there";
+
+  // Build metric stat boxes
+  const scoreBoxEn = params.avgScore !== null
+    ? `<div class="stat">
+         <div class="sv">${params.avgScore.toFixed(1)}</div>
+         <div class="sl">Avg Score / 100</div>
+       </div>`
+    : "";
+  const scoreBoxAr = params.avgScore !== null
+    ? `<div class="stat">
+         <div class="sv">${params.avgScore.toFixed(1)}</div>
+         <div class="sl-ar">متوسط الدرجة / 100</div>
+       </div>`
+    : "";
+
+  // Dimension highlights (top 2 metrics if available)
+  const dimHtmlEn = (params.topDimension || params.lowestDimension) ? `
+    <div style="margin:4px 0 18px">
+      ${params.topDimension    ? `<div class="dim">&#128170;&ensp;<strong>Strongest:</strong> ${params.topDimension}</div>` : ""}
+      ${params.lowestDimension ? `<div class="dim">&#9888;&ensp;<strong>Needs attention:</strong> ${params.lowestDimension}</div>` : ""}
+    </div>` : "";
+
+  const dimHtmlAr = (params.topDimension || params.lowestDimension) ? `
+    <div style="margin:4px 0 18px">
+      ${params.topDimension    ? `<div class="dim-ar">&#128170;&ensp;<strong>الأقوى:</strong> ${params.topDimension}</div>` : ""}
+      ${params.lowestDimension ? `<div class="dim-ar">&#9888;&ensp;<strong>يحتاج اهتماماً:</strong> ${params.lowestDimension}</div>` : ""}
+    </div>` : "";
+
   const body = `
-    <p>Hi,</p>
-    <p>
-      The assessment cycle <strong>${params.cycleTitle}</strong>
-      (${params.assessmentName}) for <strong>${params.organisationName}</strong> has closed.
-    </p>
-    <div style="text-align:center;padding:16px 0;">
-      <div class="stat">
-        <div class="stat-value">${params.respondentCount}</div>
-        <div class="stat-label">Total Respondents</div>
+    <div class="en">
+      <p>Hi ${name},</p>
+      <p>
+        The <strong>${params.cycleTitle}</strong> (${asmEn}) cycle for
+        <strong>${orgEn}</strong> has closed. Your results dashboard is ready.
+      </p>
+      <div class="stats">
+        <div class="stat">
+          <div class="sv">${params.respondentCount}</div>
+          <div class="sl">Respondents</div>
+        </div>
+        ${scoreBoxEn}
       </div>
+      ${dimHtmlEn}
+      <div class="cta-row">
+        <a class="cta" href="${params.dashboardUrl}">View Results Dashboard &rarr;</a>
+      </div>
+      <p class="mute">
+        All results are aggregated and anonymous. Department breakdowns are only shown
+        where there are 5 or more respondents, in accordance with privacy regulations.
+      </p>
     </div>
-    <p>
-      Your results dashboard is now ready. Click below to view aggregated scores,
-      department breakdowns, and trend data.
-    </p>
-    <a href="${params.dashboardUrl}" class="cta">View Results Dashboard →</a>
-    <p style="font-size:13px;color:#6b7280;">
-      All results are aggregated — individual responses are never displayed.
-      Department breakdowns are only shown where there are 5 or more respondents.
-    </p>
-  `;
+
+    <div class="ar">
+      <p>مرحباً ${name},</p>
+      <p>
+        انتهت دورة <strong>${params.cycleTitle}</strong> (${asmAr}) لمؤسسة
+        <strong>${orgAr}</strong>. لوحة نتائجك جاهزة الآن.
+      </p>
+      <div class="stats">
+        <div class="stat">
+          <div class="sv">${params.respondentCount}</div>
+          <div class="sl-ar">المشاركون</div>
+        </div>
+        ${scoreBoxAr}
+      </div>
+      ${dimHtmlAr}
+      <div class="cta-row">
+        <a class="cta" href="${params.dashboardUrl}">عرض لوحة النتائج &larr;</a>
+      </div>
+      <p class="mute" style="direction:rtl;text-align:right">
+        جميع النتائج مجمّعة ومجهولة الهوية. تُعرض تفاصيل الأقسام فقط عند مشاركة
+        5 أشخاص أو أكثر، وفقاً لأنظمة حماية البيانات.
+      </p>
+    </div>`;
 
   try {
     await sgMail.send({
-      to: params.recipientEmail,
-      from: FROM,
-      subject: `Results ready: ${params.cycleTitle} — ${params.respondentCount} responses`,
-      html: htmlWrapper("Assessment Results Ready", body),
+      to:      params.recipientEmail,
+      from:    FROM,
+      subject: `Results ready: ${params.cycleTitle} — ${params.respondentCount} responses · ${orgEn}`,
+      html:    html("Assessment Results Ready · النتائج جاهزة", body),
     });
-    logger.info("Cycle closed notification sent", { to: params.recipientEmail });
+    logger.info("Cycle-closed notification sent", { to: params.recipientEmail });
   } catch (err) {
-    logger.error("Failed to send cycle closed notification", { err });
+    logger.error("sendCycleClosedNotification failed", { err });
     throw err;
   }
 }
 
-/**
- * Weekly/monthly summary report email for HR/Executive users.
- */
-export async function sendReportEmail(params: WeeklyReportParams): Promise<void> {
-  const avgScoreHtml = params.highlights.avgScore !== null
-    ? `<div class="stat"><div class="stat-value">${params.highlights.avgScore.toFixed(1)}</div><div class="stat-label">Avg Score / 100</div></div>`
-    : "";
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. TEAM PULSE — sent to all participants when HR publishes results
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const dimensionHtml = params.highlights.topDimension
-    ? `<p>
-        💪 <strong>Strongest dimension:</strong> ${params.highlights.topDimension}<br>
-        ${params.highlights.lowestDimension ? `⚠ <strong>Needs attention:</strong> ${params.highlights.lowestDimension}` : ""}
-       </p>`
-    : "";
+export async function sendTeamPulseNotification(params: TeamPulseParams): Promise<void> {
+  const orgEn = params.organisationName;
+  const orgAr = params.organisationNameAr ?? params.organisationName;
+  const asmEn = params.assessmentName;
+  const asmAr = params.assessmentNameAr  ?? params.assessmentName;
 
   const body = `
-    <p>Hi ${params.recipientName},</p>
-    <p>Here is your Sawa people intelligence summary for <strong>${params.organisationName}</strong>.</p>
-    <p style="font-size:13px;color:#6b7280;">Period: ${params.periodLabel}</p>
-    <div style="text-align:center;padding:16px 0;">
-      <div class="stat">
-        <div class="stat-value">${params.highlights.totalRespondents}</div>
-        <div class="stat-label">Respondents</div>
-      </div>
-      ${avgScoreHtml}
+    <div class="en">
+      <p>Hi there,</p>
+      <p>
+        The results for the <strong>${params.cycleTitle}</strong> (${asmEn})
+        assessment at <strong>${orgEn}</strong> have been reviewed by leadership.
+      </p>
+      <p>
+        The aggregated insights from your participation are now informing
+        workplace improvement efforts across the organisation. These results
+        help guide decisions around culture, wellbeing, and the working environment.
+      </p>
+      <p>
+        <strong>Thank you for participating.</strong> Your voice makes a real difference —
+        even though your responses remain completely anonymous.
+      </p>
+      <p class="mute">
+        Individual results are never shared. All data is aggregated and shown
+        only as group statistics. If you have questions about your data, use
+        your session token to access or delete your record at any time.
+      </p>
     </div>
-    ${dimensionHtml}
-    <a href="${params.dashboardUrl}" class="cta">Open Full Dashboard →</a>
-    <p style="font-size:13px;color:#6b7280;">
-      This report is generated automatically. Results are aggregated and anonymous.
-    </p>
-  `;
+
+    <div class="ar">
+      <p>مرحباً،</p>
+      <p>
+        استعرضت القيادة نتائج تقييم <strong>${params.cycleTitle}</strong>
+        (${asmAr}) في مؤسسة <strong>${orgAr}</strong>.
+      </p>
+      <p>
+        الرؤى المجمّعة من مشاركتك تُسهم الآن في توجيه جهود تحسين بيئة العمل
+        في المؤسسة. وستُستخدم هذه النتائج لدعم قرارات تتعلق بالثقافة
+        والرفاهية وبيئة العمل.
+      </p>
+      <p>
+        <strong>شكراً لمشاركتك.</strong> صوتك يُحدث فارقاً حقيقياً —
+        حتى وإن ظلت ردودك مجهولة الهوية تماماً.
+      </p>
+      <p class="mute" style="direction:rtl;text-align:right">
+        لا تُشارَك النتائج الفردية مطلقاً. جميع البيانات مجمّعة وتُعرض
+        كإحصاءات جماعية فقط. إذا كانت لديك أسئلة حول بياناتك، استخدم
+        رمز جلستك للوصول إلى سجلاتك أو حذفها في أي وقت.
+      </p>
+    </div>`;
+
+  const subject = `Your participation mattered — ${params.cycleTitle} · ${orgEn}`;
+
+  const messages = params.recipientEmails.map((to) => ({
+    to,
+    from: FROM,
+    subject,
+    html:  html("Team Pulse · نبضة الفريق", body),
+  }));
+
+  try {
+    await sgMail.send(messages as any);
+    logger.info(`Team pulse sent to ${messages.length} recipients`, { cycleTitle: params.cycleTitle });
+  } catch (err) {
+    logger.error("sendTeamPulseNotification failed", { err });
+    throw err;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. WEEKLY / PERIODIC REPORT (HR/Executive summary)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function sendReportEmail(params: WeeklyReportParams): Promise<void> {
+  const scoreBoxEn = params.highlights.avgScore !== null
+    ? `<div class="stat">
+         <div class="sv">${params.highlights.avgScore.toFixed(1)}</div>
+         <div class="sl">Avg Score / 100</div>
+       </div>`
+    : "";
+
+  const dimHtmlEn = (params.highlights.topDimension || params.highlights.lowestDimension) ? `
+    <div style="margin:4px 0 18px">
+      ${params.highlights.topDimension    ? `<div class="dim">&#128170;&ensp;<strong>Strongest:</strong> ${params.highlights.topDimension}</div>` : ""}
+      ${params.highlights.lowestDimension ? `<div class="dim">&#9888;&ensp;<strong>Needs attention:</strong> ${params.highlights.lowestDimension}</div>` : ""}
+    </div>` : "";
+
+  const body = `
+    <div class="en">
+      <p>Hi ${params.recipientName},</p>
+      <p>
+        Here is your Sawa people intelligence summary for
+        <strong>${params.organisationName}</strong>.
+      </p>
+      <p class="mute">Period: ${params.periodLabel}</p>
+      <div class="stats">
+        <div class="stat">
+          <div class="sv">${params.highlights.totalRespondents}</div>
+          <div class="sl">Respondents</div>
+        </div>
+        ${scoreBoxEn}
+      </div>
+      ${dimHtmlEn}
+      <div class="cta-row">
+        <a class="cta" href="${params.dashboardUrl}">Open Full Dashboard &rarr;</a>
+      </div>
+      <p class="mute">
+        This report is generated automatically. All results are aggregated and anonymous.
+      </p>
+    </div>`;
 
   try {
     await sgMail.send({
-      to: params.recipientEmail,
-      from: FROM,
+      to:      params.recipientEmail,
+      from:    FROM,
       subject: `Sawa report — ${params.periodLabel} · ${params.organisationName}`,
-      html: htmlWrapper("People Intelligence Report", body),
+      html:    html("People Intelligence Report · تقرير الذكاء البشري", body),
     });
     logger.info("Report email sent", { to: params.recipientEmail });
   } catch (err) {
-    logger.error("Failed to send report email", { err });
+    logger.error("sendReportEmail failed", { err });
     throw err;
   }
 }

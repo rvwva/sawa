@@ -51,11 +51,43 @@ adminRouter.post(
   requireAuth,
   requireRole("ADMIN"),
   async (req: Request, res: Response) => {
-    const { name, nameAr, slug, industry, sizeRange } = req.body;
+    const { name, nameAr, slug, industry, sizeRange, cycleFrequencyDays } = req.body;
     const org = await prisma.organisation.create({
-      data: { name, nameAr, slug, industry, sizeRange },
+      data: {
+        name,
+        nameAr,
+        slug,
+        industry,
+        sizeRange,
+        ...(cycleFrequencyDays != null
+          ? { cycleFrequencyDays: Number(cycleFrequencyDays) }
+          : {}),
+      },
     });
     return res.status(201).json(org);
+  }
+);
+
+// PATCH /api/admin/organisations/:id — update org settings (e.g. cycle frequency)
+adminRouter.patch(
+  "/organisations/:id",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (req: Request, res: Response) => {
+    const { name, nameAr, industry, sizeRange, cycleFrequencyDays } = req.body;
+    const org = await prisma.organisation.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name              != null ? { name }              : {}),
+        ...(nameAr            != null ? { nameAr }            : {}),
+        ...(industry          != null ? { industry }          : {}),
+        ...(sizeRange         != null ? { sizeRange }         : {}),
+        ...(cycleFrequencyDays != null
+          ? { cycleFrequencyDays: Number(cycleFrequencyDays) }
+          : {}),
+      },
+    });
+    return res.json(org);
   }
 );
 

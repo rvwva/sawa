@@ -67,9 +67,11 @@ model Organisation {
   industry    String?
   sizeRange   String?  @map("size_range")   // e.g. "50-200"
   countryCode String   @default("SA") @map("country_code")
-  timezone    String   @default("Asia/Riyadh")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  timezone           String   @default("Asia/Riyadh")
+  // Admin-configured cycle frequency (days). 0 = ad-hoc. e.g. 30 = monthly, 90 = quarterly.
+  cycleFrequencyDays Int?     @map("cycle_frequency_days")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   departments Department[]
   users       User[]
@@ -161,11 +163,17 @@ model AssessmentCycle {
   startsAt       DateTime       @map("starts_at")
   endsAt         DateTime       @map("ends_at")
   // Unique public link token for anonymous employees
-  linkToken      String         @unique @default(cuid()) @map("link_token")
-  reminderSentAt DateTime?      @map("reminder_sent_at")
-  closedAt       DateTime?      @map("closed_at")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
+  linkToken          String         @unique @default(cuid()) @map("link_token")
+  // Employee email list stored so automated reminders can be sent without re-upload
+  recipientEmails    Json?          @map("recipient_emails")       // String[]
+  // Tracks which automated reminders were sent: { "3d": ISO, "1d": ISO }
+  remindersSent      Json?          @map("reminders_sent")
+  reminderSentAt     DateTime?      @map("reminder_sent_at")       // legacy manual reminder
+  closedAt           DateTime?      @map("closed_at")
+  // Set when HR publishes results to employees (triggers team pulse email)
+  resultsPublishedAt DateTime?      @map("results_published_at")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
 
   organisation Organisation  @relation(fields: [organisationId], references: [id])
   assessment   Assessment    @relation(fields: [assessmentId], references: [id])

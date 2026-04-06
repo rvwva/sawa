@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -155,6 +155,9 @@ export default function DashboardPage() {
   const [cycles, setCycles]         = useState<Cycle[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [loading, setLoading]       = useState(true);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const exportRef = useRef<HTMLDivElement>(null);
 
   // Per-cycle detail
   const [cycleResult, setCycleResult] = useState<CycleResult | null>(null);
@@ -222,6 +225,44 @@ export default function DashboardPage() {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  async function downloadPDF() {
+    if (!exportRef.current || pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      const { default: html2canvas } = await import("html2canvas");
+      const { default: jsPDF }       = await import("jspdf");
+
+      const canvas = await html2canvas(exportRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#f9fafb",
+      });
+
+      const imgData   = canvas.toDataURL("image/jpeg", 0.88);
+      const pdf       = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW     = pdf.internal.pageSize.getWidth();
+      const pageH     = pdf.internal.pageSize.getHeight();
+      const imgH      = (canvas.height / canvas.width) * pageW;
+      let   y         = 0;
+
+      // Multi-page support: slice canvas across A4 pages
+      while (y < imgH) {
+        if (y > 0) pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, -y, pageW, imgH);
+        y += pageH;
+      }
+
+      const cycleName = cycleResult?.title ?? "dashboard";
+      const dateStr   = new Date().toISOString().split("T")[0];
+      pdf.save(`sawa-${cycleName.replace(/\s+/g, "-").toLowerCase()}-${dateStr}.pdf`);
+    } catch (err) {
+      console.error("PDF export failed", err);
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
   function signOut() {
     localStorage.removeItem("sawa_token");
     localStorage.removeItem("sawa_user");
@@ -273,6 +314,21 @@ export default function DashboardPage() {
           <span className="font-bold text-brand-600 text-xl tracking-tight">Sawa · سواء</span>
           <div className="flex items-center gap-3">
             <LanguageToggle lang={lang} onChange={setLang} />
+            <button
+              onClick={downloadPDF}
+              disabled={pdfLoading}
+              title={lang === "ar" ? "تنزيل PDF" : "Download PDF"}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-300 bg-white/80 text-sm font-medium text-gray-600 hover:border-brand-400 hover:text-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {pdfLoading ? (
+                <span className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-8m0 8l-3-3m3 3l3-3M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+                </svg>
+              )}
+              <span className="hidden sm:inline">PDF</span>
+            </button>
             <span className="text-sm text-gray-500 hidden sm:block">
               {user.firstName} {user.lastName}
             </span>
@@ -286,7 +342,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      <main ref={exportRef} className="max-w-6xl mx-auto px-4 py-8 space-y-8">
 
         {/* ── Title ── */}
         <div>

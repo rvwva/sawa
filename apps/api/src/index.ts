@@ -17,6 +17,7 @@ import { dataRightsRouter } from "./routes/dataRights";
 import { errorHandler } from "./middleware/errorHandler";
 import { logger } from "./lib/logger";
 import { checkDatabaseConnection } from "./lib/prisma";
+import { startScheduler } from "./services/scheduler";
 
 const app = express();
 const PORT = parseInt(process.env.API_PORT ?? "4000", 10);
@@ -73,6 +74,7 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   logger.info(`Sawa API running on port ${PORT} [${process.env.NODE_ENV}]`);
+  startScheduler();
 });
 
 export default app;
