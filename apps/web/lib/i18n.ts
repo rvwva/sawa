@@ -116,6 +116,59 @@ const ui = {
     print_title:  "My Sawa Assessment Results",
     print_date:   "Assessment date",
     print_org:    "Organisation",
+
+    // ── Executive Dashboard ───────────────────────────────
+    exec_title:           "Executive Dashboard",
+    exec_welcome:         "Welcome back",
+    exec_sign_out:        "Sign out",
+    exec_new_cycle:       "+ New Cycle",
+
+    stat_total_cycles:    "Total Cycles",
+    stat_active_cycles:   "Active Cycles",
+    stat_respondents:     "Total Respondents",
+    stat_avg_score:       "Avg Score",
+
+    section_scores:       "Organisation Scores",
+    section_trend:        "Score Trend",
+    section_departments:  "Department Breakdown",
+    section_participation:"Participation",
+    section_cycles:       "Assessment Cycles",
+
+    cycle_prompt:         "Select a cycle to view detailed results",
+    cycle_no_cycles:      "No assessment cycles yet.",
+    cycle_create_first:   "Create your first cycle to get started.",
+
+    risk_title:           "Score Drop Detected",
+    risk_desc_pre:        "Overall score fell by",
+    risk_desc_post:       "points compared to the previous cycle.",
+
+    trend_no_data:        "Not enough cycles to display a trend.",
+    trend_score:          "Avg Score",
+
+    dept_col_dept:        "Department",
+    dept_col_n:           "Respondents",
+    dept_col_score:       "Score",
+    dept_col_band:        "Band",
+    dept_suppressed:      "Departments with fewer than 5 respondents are hidden to protect anonymity.",
+    dept_no_data:         "No departments with 5+ respondents yet.",
+
+    part_rate:            "Completion Rate",
+    part_submitted:       "Submitted",
+    part_started:         "Started",
+    part_by_dept:         "By Department",
+    part_meets_min:       "Meets threshold (5+)",
+
+    cycle_col_title:      "Title",
+    cycle_col_type:       "Type",
+    cycle_col_status:     "Status",
+    cycle_col_n:          "Respondents",
+    cycle_col_closes:     "Closes",
+    cycle_view:           "View",
+
+    no_submissions:       "No submissions yet for this cycle.",
+    loading_results:      "Loading results…",
+    overall_score:        "Overall Score",
+    subscales_title:      "Subscale Breakdown",
   },
 
   ar: {
@@ -224,6 +277,59 @@ const ui = {
     print_title:  "نتائج تقييم سواء",
     print_date:   "تاريخ التقييم",
     print_org:    "المؤسسة",
+
+    // ── Executive Dashboard ───────────────────────────────
+    exec_title:           "لوحة القيادة التنفيذية",
+    exec_welcome:         "مرحباً بعودتك",
+    exec_sign_out:        "تسجيل الخروج",
+    exec_new_cycle:       "+ دورة جديدة",
+
+    stat_total_cycles:    "إجمالي الدورات",
+    stat_active_cycles:   "الدورات النشطة",
+    stat_respondents:     "إجمالي المشاركين",
+    stat_avg_score:       "متوسط الدرجات",
+
+    section_scores:       "درجات المؤسسة",
+    section_trend:        "مؤشر الاتجاه",
+    section_departments:  "تفصيل الأقسام",
+    section_participation:"نسبة المشاركة",
+    section_cycles:       "دورات التقييم",
+
+    cycle_prompt:         "اختر دورة لعرض النتائج التفصيلية",
+    cycle_no_cycles:      "لا توجد دورات تقييم بعد.",
+    cycle_create_first:   "أنشئ دورتك الأولى للبدء.",
+
+    risk_title:           "تحذير: انخفاض في الدرجات",
+    risk_desc_pre:        "انخفضت الدرجة الإجمالية بمقدار",
+    risk_desc_post:       "نقطة مقارنةً بالدورة السابقة.",
+
+    trend_no_data:        "لا توجد دورات كافية لعرض مؤشر الاتجاه.",
+    trend_score:          "متوسط الدرجة",
+
+    dept_col_dept:        "القسم",
+    dept_col_n:           "المشاركون",
+    dept_col_score:       "الدرجة",
+    dept_col_band:        "المستوى",
+    dept_suppressed:      "الأقسام التي يقل عدد مشاركيها عن 5 مخفية حفاظاً على السرية.",
+    dept_no_data:         "لا توجد أقسام بـ 5 مشاركين أو أكثر حتى الآن.",
+
+    part_rate:            "نسبة الإكمال",
+    part_submitted:       "أكملوا التقييم",
+    part_started:         "بدأوا التقييم",
+    part_by_dept:         "حسب القسم",
+    part_meets_min:       "يستوفي الحد الأدنى (5+)",
+
+    cycle_col_title:      "العنوان",
+    cycle_col_type:       "النوع",
+    cycle_col_status:     "الحالة",
+    cycle_col_n:          "المشاركون",
+    cycle_col_closes:     "ينتهي",
+    cycle_view:           "عرض",
+
+    no_submissions:       "لا توجد إرسالات لهذه الدورة بعد.",
+    loading_results:      "جارٍ تحميل النتائج…",
+    overall_score:        "الدرجة الإجمالية",
+    subscales_title:      "تفاصيل المقاييس الفرعية",
   },
 } as const;
 
