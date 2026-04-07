@@ -44,7 +44,7 @@ export default function AuditPage() {
 
   useEffect(() => {
     setLoading(true);
-    const token = localStorage.getItem("sawa_token");
+    const token = localStorage.getItem("mindlign_token");
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/audit-log?page=${page}&limit=${LIMIT}`, {
       headers: { Authorization: `Bearer ${token}` },
     })

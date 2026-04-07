@@ -51,7 +51,7 @@ export default function OrganisationsPage() {
   const [search, setSearch]   = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("sawa_token");
+    const token = localStorage.getItem("mindlign_token");
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/organisations`, {
       headers: { Authorization: `Bearer ${token}` },
     })

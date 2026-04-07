@@ -86,7 +86,7 @@ export default function OrgDetailPage() {
   const [tab, setTab]         = useState<"cycles" | "contacts" | "settings">("cycles");
 
   const authHeader = useCallback(() => {
-    const token = localStorage.getItem("sawa_token");
+    const token = localStorage.getItem("mindlign_token");
     return {
       Authorization:  `Bearer ${token ?? ""}`,
       "Content-Type": "application/json",
@@ -94,7 +94,7 @@ export default function OrgDetailPage() {
   }, []);
 
   const loadOrg = useCallback(() => {
-    const token = localStorage.getItem("sawa_token");
+    const token = localStorage.getItem("mindlign_token");
     if (!token) { router.push("/login"); return; }
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/organisations/${id}`, {
       headers: authHeader(),

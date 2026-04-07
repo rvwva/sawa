@@ -53,8 +53,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // ── Auth guard: ADMIN only ─────────────────────────────────────────────────
   useEffect(() => {
-    const stored = localStorage.getItem("sawa_user");
-    const token  = localStorage.getItem("sawa_token");
+    const stored = localStorage.getItem("mindlign_user");
+    const token  = localStorage.getItem("mindlign_token");
     if (!stored || !token) { router.push("/login"); return; }
     const u = JSON.parse(stored);
     if (u.role !== "ADMIN") { router.push("/dashboard"); return; }
@@ -62,8 +62,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [router]);
 
   function signOut() {
-    localStorage.removeItem("sawa_token");
-    localStorage.removeItem("sawa_user");
+    localStorage.removeItem("mindlign_token");
+    localStorage.removeItem("mindlign_user");
     router.push("/login");
   }
 
@@ -101,7 +101,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Logo */}
         <div className="px-5 py-5 border-b border-gray-100">
           <Link href="/admin" className="block">
-            <span className="font-extrabold text-brand-600 text-lg tracking-tight">Sawa · سواء</span>
+            <span className="font-extrabold text-brand-600 text-lg tracking-tight">Mindlign</span>
             <span className="block text-xs text-gray-400 mt-0.5 font-medium uppercase tracking-wider">
               Platform Admin
             </span>

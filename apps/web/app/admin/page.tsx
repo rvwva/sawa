@@ -58,7 +58,7 @@ export default function AdminHomePage() {
   const [error, setError]     = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("sawa_token");
+    const token = localStorage.getItem("mindlign_token");
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/dashboard`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -85,7 +85,7 @@ export default function AdminHomePage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t("admin_dashboard")}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Sawa · Platform Overview</p>
+          <p className="text-sm text-gray-500 mt-0.5">Mindlign · Platform Overview</p>
         </div>
         <Link
           href="/admin/organisations/new"

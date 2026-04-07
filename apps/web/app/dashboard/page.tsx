@@ -170,8 +170,8 @@ export default function DashboardPage() {
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("sawa_user");
-    const token = localStorage.getItem("sawa_token");
+    const storedUser = localStorage.getItem("mindlign_user");
+    const token = localStorage.getItem("mindlign_token");
     if (!storedUser || !token) { router.push("/login"); return; }
 
     const u = JSON.parse(storedUser);
@@ -198,7 +198,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!selectedId) return;
-    const token = localStorage.getItem("sawa_token");
+    const token = localStorage.getItem("mindlign_token");
     if (!token) return;
 
     const headers = { Authorization: `Bearer ${token}` };
@@ -234,7 +234,7 @@ export default function DashboardPage() {
     const cycle = cycles.find((c) => c.id === selectedId);
     if (cycle?.status !== "ACTIVE") return;
 
-    const token = localStorage.getItem("sawa_token");
+    const token = localStorage.getItem("mindlign_token");
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
     const base = `${process.env.NEXT_PUBLIC_API_URL}/results/cycle/${selectedId}`;
@@ -290,8 +290,8 @@ export default function DashboardPage() {
   }
 
   function signOut() {
-    localStorage.removeItem("sawa_token");
-    localStorage.removeItem("sawa_user");
+    localStorage.removeItem("mindlign_token");
+    localStorage.removeItem("mindlign_user");
     router.push("/login");
   }
 
@@ -337,7 +337,7 @@ export default function DashboardPage() {
       {/* ── Nav ── */}
       <header className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-          <span className="font-bold text-brand-600 text-xl tracking-tight">Sawa · سواء</span>
+          <span className="font-bold text-brand-600 text-xl tracking-tight">Mindlign</span>
           <div className="flex items-center gap-3">
             <LanguageToggle lang={lang} onChange={setLang} />
             <button
@@ -822,10 +822,10 @@ function DeptPanel({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left pb-3 pr-4 font-medium text-gray-500">{t("dept_col_dept")}</th>
-                  <th className="text-right pb-3 px-4 font-medium text-gray-500">{t("dept_col_n")}</th>
-                  <th className="text-right pb-3 px-4 font-medium text-gray-500">{t("dept_col_score")}</th>
-                  <th className="text-left pb-3 px-4 font-medium text-gray-500 hidden sm:table-cell">
+                  <th className="text-start pb-3 pe-4 font-medium text-gray-500">{t("dept_col_dept")}</th>
+                  <th className="text-end pb-3 px-4 font-medium text-gray-500">{t("dept_col_n")}</th>
+                  <th className="text-end pb-3 px-4 font-medium text-gray-500">{t("dept_col_score")}</th>
+                  <th className="text-start pb-3 px-4 font-medium text-gray-500 hidden sm:table-cell">
                     {t("dept_col_band")}
                   </th>
                   {showExtra && orgSubs.map((s) => (
@@ -843,9 +843,9 @@ function DeptPanel({
                   const main = getDeptScore(dept);
                   return (
                     <tr key={dept.departmentId} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3 pr-4 font-medium text-gray-800">{dept.departmentName}</td>
-                      <td className="py-3 px-4 text-right text-gray-600">{dept.respondentCount}</td>
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3 pe-4 font-medium text-gray-800">{dept.departmentName}</td>
+                      <td className="py-3 px-4 text-end text-gray-600">{dept.respondentCount}</td>
+                      <td className="py-3 px-4 text-end">
                         {main ? (
                           <span className={`font-bold ${bandColor(main.band)}`}>
                             {Math.round(main.avg)}
@@ -862,7 +862,7 @@ function DeptPanel({
                       {showExtra && orgSubs.map((os) => {
                         const ds = dept.subscales.find((s) => s.subscale === os.subscale);
                         return (
-                          <td key={os.subscale} className="py-3 px-2 text-right hidden lg:table-cell">
+                          <td key={os.subscale} className="py-3 px-2 text-end hidden lg:table-cell">
                             {ds ? (
                               <span className={`text-xs font-semibold ${bandColor(ds.band)}`}>
                                 {Math.round(ds.avg)}
@@ -902,13 +902,13 @@ function OrgAvgRow({
   if (!orgTotal) return null;
   return (
     <tr className="bg-gray-50 border-b border-gray-200 font-medium">
-      <td className="py-3 pr-4 text-gray-600 text-sm italic">
+      <td className="py-3 pe-4 text-gray-600 text-sm italic">
         {lang === "ar" ? "متوسط المؤسسة" : "Organisation avg"}
       </td>
-      <td className="py-3 px-4 text-right text-gray-500 text-sm">
+      <td className="py-3 px-4 text-end text-gray-500 text-sm">
         {deptData.organisation.respondentCount}
       </td>
-      <td className="py-3 px-4 text-right">
+      <td className="py-3 px-4 text-end">
         <span className={`font-bold ${bandColor(orgTotal.band)}`}>
           {Math.round(orgTotal.avg)}
         </span>

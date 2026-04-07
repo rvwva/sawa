@@ -1,5 +1,5 @@
 /**
- * Sawa Platform — UI Translations
+ * Mindlign Platform — UI Translations
  * ================================
  * Bilingual English / Arabic for all employee-facing UI text.
  * Survey question text lives in survey-translations.ts.
@@ -16,7 +16,7 @@ const ui = {
 
     // ── General ──────────────────────────────────────────
     loading:         "Loading assessment…",
-    poweredBy:       "Powered by Sawa",
+    poweredBy:       "Powered by Mindlign",
     close:           "Close",
     download:        "Download my results",
     copy:            "Copy",
@@ -113,7 +113,7 @@ const ui = {
     guidance_culture_needs_attn:    "This area needs focused attention and investment.",
 
     // ── Print / PDF ───────────────────────────────────────
-    print_title:  "My Sawa Assessment Results",
+    print_title:  "My Mindlign Assessment Results",
     print_date:   "Assessment date",
     print_org:    "Organisation",
 
@@ -276,7 +276,7 @@ const ui = {
 
     // ── General ──────────────────────────────────────────
     loading:         "جارٍ تحميل التقييم…",
-    poweredBy:       "مدعوم من سواء",
+    poweredBy:       "مدعوم من Mindlign",
     close:           "إغلاق",
     download:        "تنزيل نتائجي",
     copy:            "نسخ",
@@ -373,7 +373,7 @@ const ui = {
     guidance_culture_needs_attn:    "هذا المجال يحتاج إلى اهتمام واستثمار مركّز.",
 
     // ── Print / PDF ───────────────────────────────────────
-    print_title:  "نتائج تقييم سواء",
+    print_title:  "نتائج تقييم Mindlign",
     print_date:   "تاريخ التقييم",
     print_org:    "المؤسسة",
 

@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Sawa — Workplace Culture & People Intelligence",
+  title: "Mindlign — Workplace Culture & People Intelligence",
   description:
-    "Sawa helps organisations in Saudi Arabia measure, understand, and improve workplace culture and employee wellbeing.",
+    "Mindlign helps organisations in Saudi Arabia measure, understand, and improve workplace culture and employee wellbeing.",
   keywords: ["employee wellbeing", "culture assessment", "burnout", "HR analytics", "KSA"],
 };
 

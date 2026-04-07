@@ -174,7 +174,7 @@ export default function AssessmentPage() {
               />
             ) : (
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-brand-600 text-lg tracking-tight">Sawa</span>
+                <span className="font-black text-brand-600 text-lg tracking-tight">Mindlign</span>
                 <span className="text-gray-300">·</span>
                 <span className="font-bold text-gray-700 text-sm truncate">{orgName}</span>
               </div>
@@ -254,7 +254,7 @@ export default function AssessmentPage() {
 
       {/* ── Footer ─────────────────────────────────────────── */}
       <footer className="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur border-t border-gray-100 py-2 text-center">
-        <p className="text-xs text-gray-400">{t("poweredBy")} · سواء</p>
+        <p className="text-xs text-gray-400">{t("poweredBy")}</p>
       </footer>
     </div>
   );

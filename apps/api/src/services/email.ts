@@ -1,5 +1,5 @@
 /**
- * Sawa Email Service — SendGrid
+ * Mindlign Email Service — SendGrid
  * ================================
  * Professional bilingual (English / Arabic) transactional emails via SendGrid.
  * All four notification types:
@@ -16,7 +16,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY ?? "");
 
 const FROM = {
   email: process.env.EMAIL_FROM      ?? "noreply@sawa.app",
-  name:  process.env.EMAIL_FROM_NAME ?? "Sawa Platform",
+  name:  process.env.EMAIL_FROM_NAME ?? "Mindlign",
 };
 
 // ─── Parameter interfaces ─────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ function html(title: string, body: string): string {
 <body>
   <div class="w">
     <div class="hdr">
-      <div class="hdr-logo">Sawa &middot; سواء</div>
+      <div class="hdr-logo">Mindlign</div>
       <div class="hdr-sub">
         Workplace Culture &amp; People Intelligence<br>
         ثقافة بيئة العمل والذكاء البشري
@@ -165,7 +165,7 @@ function html(title: string, body: string): string {
     </div>
     ${body}
     <div class="ftr">
-      &copy; Sawa Platform &middot; Riyadh, Saudi Arabia &middot; الرياض، المملكة العربية السعودية<br>
+      &copy; Mindlign &middot; Riyadh, Saudi Arabia &middot; الرياض، المملكة العربية السعودية<br>
       This email is confidential and intended only for the named recipient.<br>
       هذه الرسالة سرية وموجهة للمستلم المحدد فقط.
     </div>
@@ -530,7 +530,7 @@ export async function sendReportEmail(params: WeeklyReportParams): Promise<void>
     <div class="en">
       <p>Hi ${params.recipientName},</p>
       <p>
-        Here is your Sawa people intelligence summary for
+        Here is your Mindlign people intelligence summary for
         <strong>${params.organisationName}</strong>.
       </p>
       <p class="mute">Period: ${params.periodLabel}</p>
@@ -554,7 +554,7 @@ export async function sendReportEmail(params: WeeklyReportParams): Promise<void>
     await sgMail.send({
       to:      params.recipientEmail,
       from:    FROM,
-      subject: `Sawa report — ${params.periodLabel} · ${params.organisationName}`,
+      subject: `Mindlign report — ${params.periodLabel} · ${params.organisationName}`,
       html:    html("People Intelligence Report · تقرير الذكاء البشري", body),
     });
     logger.info("Report email sent", { to: params.recipientEmail });

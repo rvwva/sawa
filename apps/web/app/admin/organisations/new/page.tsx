@@ -81,7 +81,7 @@ export default function NewClientPage() {
     setError("");
     setLoading(true);
 
-    const token = localStorage.getItem("sawa_token");
+    const token = localStorage.getItem("mindlign_token");
     const headers = {
       Authorization:  `Bearer ${token}`,
       "Content-Type": "application/json",

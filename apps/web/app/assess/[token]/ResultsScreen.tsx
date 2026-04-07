@@ -93,7 +93,7 @@ function ScoreBar({
         <span className="text-sm text-gray-700 font-medium leading-tight">{label}</span>
         <div className="flex items-center gap-2 shrink-0">
           <BandCard band={band} score={score} compact lang={lang} />
-          <span className="text-sm font-bold text-gray-800 w-12 text-right">
+          <span className="text-sm font-bold text-gray-800 w-12 text-end">
             {Math.round(score)}<span className="text-gray-400 font-normal text-xs">/100</span>
           </span>
         </div>
@@ -146,7 +146,7 @@ function ComparisonRow({
                 style={{ width: `${item.score}%`, backgroundColor: item.color }}
               />
             </div>
-            <span className="text-xs font-bold text-gray-700 w-8 text-right">
+            <span className="text-xs font-bold text-gray-700 w-8 text-end">
               {Math.round(item.score)}
             </span>
           </div>
