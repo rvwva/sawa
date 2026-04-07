@@ -165,6 +165,7 @@ export default function DashboardPage() {
   const [trendData, setTrendData]     = useState<TrendData | null>(null);
   const [rateData, setRateData]       = useState<ResponseRate | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -178,17 +179,18 @@ export default function DashboardPage() {
     const headers = { Authorization: `Bearer ${token}` };
 
     Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/reports/dashboard/${u.organisationId}`, { headers }).then((r) => r.json()),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/assessments/cycles?organisationId=${u.organisationId}`, { headers }).then((r) => r.json()),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/reports/dashboard/${u.organisationId}`, { headers }).then((r) => r.ok ? r.json() : null),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/assessments/cycles?organisationId=${u.organisationId}`, { headers }).then((r) => r.ok ? r.json() : []),
     ])
       .then(([s, c]) => {
-        setStats(s);
+        if (s) setStats(s);
         const list: Cycle[] = Array.isArray(c) ? c : [];
         setCycles(list);
         // Auto-select the most recent active cycle
         const active = list.find((x) => x.status === "ACTIVE") ?? list[0];
         if (active) setSelectedId(active.id);
       })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -205,14 +207,15 @@ export default function DashboardPage() {
     setDeptData(null);
     setTrendData(null);
     setRateData(null);
+    setDetailError("");
 
     const base = `${process.env.NEXT_PUBLIC_API_URL}/results/cycle/${selectedId}`;
 
     Promise.all([
-      fetch(base, { headers }).then((r) => r.json()),
-      fetch(`${base}/departments`, { headers }).then((r) => r.json()),
-      fetch(`${base}/trend`, { headers }).then((r) => r.json()),
-      fetch(`${base}/response-rate`, { headers }).then((r) => r.json()),
+      fetch(base, { headers }).then((r) => { if (!r.ok) throw new Error("cycle"); return r.json(); }),
+      fetch(`${base}/departments`, { headers }).then((r) => { if (!r.ok) throw new Error("dept"); return r.json(); }),
+      fetch(`${base}/trend`, { headers }).then((r) => { if (!r.ok) throw new Error("trend"); return r.json(); }),
+      fetch(`${base}/response-rate`, { headers }).then((r) => { if (!r.ok) throw new Error("rate"); return r.json(); }),
     ])
       .then(([cr, dd, td, rd]) => {
         setCycleResult(cr);
@@ -220,8 +223,31 @@ export default function DashboardPage() {
         setTrendData(td);
         setRateData(rd);
       })
+      .catch(() => setDetailError(lang === "ar" ? "تعذّر تحميل بيانات الدورة." : "Failed to load cycle data."))
       .finally(() => setDetailLoading(false));
   }, [selectedId]);
+
+  // ── Live polling: refresh response-rate every 30s for ACTIVE cycles ──────
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const cycle = cycles.find((c) => c.id === selectedId);
+    if (cycle?.status !== "ACTIVE") return;
+
+    const token = localStorage.getItem("sawa_token");
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+    const base = `${process.env.NEXT_PUBLIC_API_URL}/results/cycle/${selectedId}`;
+
+    const id = setInterval(() => {
+      fetch(`${base}/response-rate`, { headers })
+        .then((r) => r.ok ? r.json() : null)
+        .then((rd) => { if (rd) setRateData(rd); })
+        .catch(() => {});
+    }, 30_000);
+
+    return () => clearInterval(id);
+  }, [selectedId, cycles]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -411,6 +437,10 @@ export default function DashboardPage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500" />
                   <p className="text-sm text-gray-500">{t("loading_results")}</p>
                 </div>
+              </div>
+            ) : detailError ? (
+              <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-4 text-red-700 text-sm">
+                {detailError}
               </div>
             ) : (
               <>

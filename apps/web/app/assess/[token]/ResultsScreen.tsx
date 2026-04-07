@@ -171,6 +171,7 @@ export default function ResultsScreen({
   const [comparison, setComparison]   = useState<Comparison | null>(null);
   const [deptComparison, setDeptComparison] = useState<Comparison | null>(null);
   const [showToken, setShowToken]     = useState(false);
+  const [deleteState, setDeleteState] = useState<"idle" | "pending" | "done" | "error">("idle");
 
   // Fetch comparison data (org avg + dept avg)
   useEffect(() => {
@@ -339,7 +340,7 @@ export default function ResultsScreen({
           <ComparisonRow
             label={t("results_overall")}
             myScore={overallScore}
-            orgAvg={comparison!["total"]?.avg ?? null}
+            orgAvg={comparison?.["total"]?.avg ?? null}
             deptAvg={deptComparison?.["total"]?.avg ?? null}
             t={t}
             lang={lang}
@@ -390,41 +391,56 @@ export default function ResultsScreen({
               </div>
 
               <div className="flex gap-2">
-                <a
-                  href={`${process.env.NEXT_PUBLIC_API_URL}/data-rights/access`}
+                {/* Access data: shows instructions (no automated export endpoint) */}
+                <button
+                  type="button"
                   className="flex-1 text-center py-2 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
-                  onClick={(e) => {
-                    e.preventDefault();
+                  onClick={() => {
+                    navigator.clipboard.writeText(sessionToken).catch(() => {});
                     alert(lang === "ar"
-                      ? `أرسل رمز جلستك إلى الدعم:\n${sessionToken}`
-                      : `Send your session token to support:\n${sessionToken}`);
+                      ? `لطلب نسخة من بياناتك، أرسل رمز جلستك إلى فريق الدعم:\n${sessionToken}`
+                      : `To request a copy of your data, send your session token to the support team:\n${sessionToken}`);
                   }}
                 >
                   {t("results_access_data")}
-                </a>
-                <a
-                  href={`${process.env.NEXT_PUBLIC_API_URL}/data-rights/delete`}
-                  className="flex-1 text-center py-2 rounded-lg border border-red-200 text-xs text-red-600 hover:bg-red-50 transition-colors"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    const confirmed = window.confirm(
-                      lang === "ar"
-                        ? "هل أنت متأكد من رغبتك في حذف جميع بياناتك؟ لا يمكن التراجع عن هذا الإجراء."
-                        : "Are you sure you want to delete all your data? This cannot be undone."
-                    );
-                    if (confirmed) {
+                </button>
+
+                {/* Delete data: calls API */}
+                {deleteState === "done" ? (
+                  <span className="flex-1 text-center py-2 rounded-lg bg-green-50 border border-green-200 text-xs text-green-700">
+                    {lang === "ar" ? "تم الحذف ✓" : "Deleted ✓"}
+                  </span>
+                ) : deleteState === "error" ? (
+                  <span className="flex-1 text-center py-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+                    {lang === "ar" ? "فشل الحذف" : "Delete failed"}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={deleteState === "pending"}
+                    className="flex-1 text-center py-2 rounded-lg border border-red-200 text-xs text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                    onClick={() => {
+                      const confirmed = window.confirm(
+                        lang === "ar"
+                          ? "هل أنت متأكد من رغبتك في حذف جميع بياناتك؟ لا يمكن التراجع عن هذا الإجراء."
+                          : "Are you sure you want to delete all your data? This cannot be undone."
+                      );
+                      if (!confirmed) return;
+                      setDeleteState("pending");
                       fetch(`${process.env.NEXT_PUBLIC_API_URL}/data-rights/delete`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ sessionToken }),
-                      }).then(() =>
-                        alert(lang === "ar" ? "تم حذف بياناتك." : "Your data has been deleted.")
-                      );
-                    }
-                  }}
-                >
-                  {t("results_delete_data")}
-                </a>
+                      })
+                        .then((r) => setDeleteState(r.ok ? "done" : "error"))
+                        .catch(() => setDeleteState("error"));
+                    }}
+                  >
+                    {deleteState === "pending"
+                      ? (lang === "ar" ? "جارٍ الحذف…" : "Deleting…")
+                      : t("results_delete_data")}
+                  </button>
+                )}
               </div>
             </div>
           )}

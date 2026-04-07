@@ -82,27 +82,44 @@ export default function OrgDetailPage() {
 
   const [org, setOrg]         = useState<OrgDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [tab, setTab]         = useState<"cycles" | "contacts" | "settings">("cycles");
 
-  const authHeader = useCallback(() => ({
-    Authorization:  `Bearer ${localStorage.getItem("sawa_token")}`,
-    "Content-Type": "application/json",
-  }), []);
+  const authHeader = useCallback(() => {
+    const token = localStorage.getItem("sawa_token");
+    return {
+      Authorization:  `Bearer ${token ?? ""}`,
+      "Content-Type": "application/json",
+    };
+  }, []);
 
   const loadOrg = useCallback(() => {
+    const token = localStorage.getItem("sawa_token");
+    if (!token) { router.push("/login"); return; }
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/organisations/${id}`, {
       headers: authHeader(),
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(r.status === 404 ? "not_found" : "error");
+        return r.json();
+      })
       .then(setOrg)
+      .catch((err) => setLoadError(err.message === "not_found"
+        ? (lang === "ar" ? "المنظمة غير موجودة." : "Organisation not found.")
+        : (lang === "ar" ? "تعذّر تحميل البيانات." : "Failed to load organisation.")))
       .finally(() => setLoading(false));
-  }, [id, authHeader]);
+  }, [id, authHeader, router, lang]);
 
   useEffect(() => { loadOrg(); }, [loadOrg]);
 
   if (loading) return (
     <div className="flex justify-center py-20">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500" />
+    </div>
+  );
+  if (loadError) return (
+    <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-4 text-red-700 text-sm max-w-md mx-auto mt-10">
+      {loadError}
     </div>
   );
   if (!org) return <p className="text-red-500">{t("admin_error")}</p>;
