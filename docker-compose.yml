@@ -1,35 +1,51 @@
 version: "3.9"
 
+# All build contexts use the monorepo root so Dockerfiles can access
+# all workspace packages.  This matches the Cloud Build setup exactly.
+
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: sawa_db
-      POSTGRES_USER: sawa
+      POSTGRES_DB: mindlign_db
+      POSTGRES_USER: mindlign
       POSTGRES_PASSWORD: changeme
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sawa -d sawa_db"]
+      test: ["CMD-SHELL", "pg_isready -U mindlign -d mindlign_db"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  scoring:
+    build:
+      context: .
+      dockerfile: packages/scoring/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      SCORING_SERVICE_API_KEY: ${SCORING_SERVICE_API_KEY:-dev-scoring-key}
+
   api:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     ports:
       - "4000:4000"
     environment:
-      DATABASE_URL: postgresql://sawa:changeme@postgres:5432/sawa_db
+      DATABASE_URL: postgresql://mindlign:changeme@postgres:5432/mindlign_db
       NODE_ENV: production
       SCORING_SERVICE_URL: http://scoring:8000
-    env_file: .env
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,26 +54,16 @@ services:
 
   web:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000/api
+        NEXT_PUBLIC_APP_URL: http://localhost:3000
     restart: unless-stopped
     ports:
       - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:4000/api
-    env_file: .env
     depends_on:
       - api
-
-  scoring:
-    build:
-      context: ./packages/scoring
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      SCORING_SERVICE_API_KEY: ${SCORING_SERVICE_API_KEY}
 
 volumes:
   postgres_data:

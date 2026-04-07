@@ -1,0 +1,29 @@
+# Files excluded from Cloud Build uploads.
+# Keep this list tight — large uploads slow down every build.
+
+.git
+.gitignore
+.github
+
+# Local env files (secrets come from Secret Manager)
+.env
+.env.*
+!.env.example
+
+# Build artifacts (rebuilt inside Docker)
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/__pycache__
+**/*.pyc
+
+# Local dev only
+docker-compose.override.yml
+scripts/
+
+# Docs / editor config
+*.md
+.editorconfig
+.vscode
+.idea

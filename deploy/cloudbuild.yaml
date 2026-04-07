@@ -1,0 +1,173 @@
+# Mindlign — Cloud Build CI/CD Pipeline
+# Region: me-central2 (Dammam, Saudi Arabia)
+#
+# Configure these substitutions in the Cloud Build trigger:
+#   _REGION    me-central2
+#   _REPO      mindlign
+#   _API_URL   https://api.yourdomain.com   (or leave as Cloud Run URL)
+#   _WEB_URL   https://app.yourdomain.com   (or leave as Cloud Run URL)
+
+substitutions:
+  _REGION: me-central2
+  _REPO: mindlign
+  _API_URL: https://api.example.com   # override in trigger
+  _WEB_URL: https://app.example.com   # override in trigger
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/mindlign-database-url/versions/latest
+      env: DATABASE_URL
+    - versionName: projects/$PROJECT_ID/secrets/mindlign-jwt-secret/versions/latest
+      env: JWT_SECRET
+    - versionName: projects/$PROJECT_ID/secrets/mindlign-refresh-secret/versions/latest
+      env: REFRESH_TOKEN_SECRET
+    - versionName: projects/$PROJECT_ID/secrets/mindlign-sendgrid-key/versions/latest
+      env: SENDGRID_API_KEY
+    - versionName: projects/$PROJECT_ID/secrets/mindlign-scoring-key/versions/latest
+      env: SCORING_KEY
+
+steps:
+
+  # ── Build: all three images in parallel ───────────────────────────────────
+  - id: build-scoring
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']
+    args:
+      - build
+      - --file=packages/scoring/Dockerfile
+      - --cache-from=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/scoring:latest
+      - --tag=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/scoring:$SHORT_SHA
+      - --tag=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/scoring:latest
+      - .
+
+  - id: build-api
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']
+    args:
+      - build
+      - --file=apps/api/Dockerfile
+      - --cache-from=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/api:latest
+      - --tag=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/api:$SHORT_SHA
+      - --tag=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/api:latest
+      - .
+
+  - id: build-web
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']
+    args:
+      - build
+      - --file=apps/web/Dockerfile
+      - --build-arg=NEXT_PUBLIC_API_URL=$_API_URL/api
+      - --build-arg=NEXT_PUBLIC_APP_URL=$_WEB_URL
+      - --cache-from=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/web:latest
+      - --tag=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/web:$SHORT_SHA
+      - --tag=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/web:latest
+      - .
+
+  # ── Push all images ────────────────────────────────────────────────────────
+  - id: push-scoring
+    name: gcr.io/cloud-builders/docker
+    waitFor: [build-scoring]
+    args: [push, --all-tags, $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/scoring]
+
+  - id: push-api
+    name: gcr.io/cloud-builders/docker
+    waitFor: [build-api]
+    args: [push, --all-tags, $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/api]
+
+  - id: push-web
+    name: gcr.io/cloud-builders/docker
+    waitFor: [build-web]
+    args: [push, --all-tags, $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/web]
+
+  # ── Deploy scoring (internal ingress — only reachable within project) ──────
+  # API key (mindlign-scoring-key) is the auth mechanism; IAM allows-unauthenticated
+  # because internal ingress already restricts network reach.
+  - id: deploy-scoring
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    waitFor: [push-scoring]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - mindlign-scoring
+      - --image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/scoring:$SHORT_SHA
+      - --region=$_REGION
+      - --platform=managed
+      - --ingress=internal
+      - --allow-unauthenticated
+      - --service-account=mindlign-scoring-sa@$PROJECT_ID.iam.gserviceaccount.com
+      - --min-instances=0
+      - --max-instances=5
+      - --memory=512Mi
+      - --cpu=1
+      - --concurrency=80
+      - --update-secrets=SCORING_SERVICE_API_KEY=mindlign-scoring-key:latest
+
+  # ── Deploy API ─────────────────────────────────────────────────────────────
+  # Uses bash so we can resolve the scoring service URL dynamically after deploy.
+  # Prisma migrate deploy runs automatically inside docker-entrypoint.sh on startup.
+  # min-instances=1 keeps the email reminder scheduler alive between requests.
+  - id: deploy-api
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    waitFor: [push-api, deploy-scoring]
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -e
+        SCORING_URL=$(gcloud run services describe mindlign-scoring \
+          --region=$_REGION --project=$PROJECT_ID --format='value(status.url)')
+        echo "Scoring service URL: $$SCORING_URL"
+        gcloud run deploy mindlign-api \
+          --image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/api:$SHORT_SHA \
+          --region=$_REGION \
+          --platform=managed \
+          --ingress=all \
+          --allow-unauthenticated \
+          --service-account=mindlign-api-sa@$PROJECT_ID.iam.gserviceaccount.com \
+          --min-instances=1 \
+          --max-instances=5 \
+          --memory=512Mi \
+          --cpu=1 \
+          --concurrency=80 \
+          --timeout=60s \
+          --add-cloudsql-instances=$PROJECT_ID:$_REGION:mindlign-postgres \
+          --update-secrets=DATABASE_URL=mindlign-database-url:latest \
+          --update-secrets=JWT_SECRET=mindlign-jwt-secret:latest \
+          --update-secrets=REFRESH_TOKEN_SECRET=mindlign-refresh-secret:latest \
+          --update-secrets=SENDGRID_API_KEY=mindlign-sendgrid-key:latest \
+          --update-secrets=SCORING_SERVICE_API_KEY=mindlign-scoring-key:latest \
+          --update-env-vars="NODE_ENV=production,API_PORT=4000,NEXT_PUBLIC_APP_URL=$_WEB_URL,SCORING_SERVICE_URL=$$SCORING_URL" \
+          --project=$PROJECT_ID
+
+  # ── Deploy web ─────────────────────────────────────────────────────────────
+  # NEXT_PUBLIC_* are baked into the image at build time — no runtime env needed.
+  - id: deploy-web
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    waitFor: [push-web, deploy-api]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - mindlign-web
+      - --image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/web:$SHORT_SHA
+      - --region=$_REGION
+      - --platform=managed
+      - --ingress=all
+      - --allow-unauthenticated
+      - --service-account=mindlign-web-sa@$PROJECT_ID.iam.gserviceaccount.com
+      - --min-instances=0
+      - --max-instances=10
+      - --memory=256Mi
+      - --cpu=1
+      - --concurrency=100
+
+images:
+  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/scoring:$SHORT_SHA
+  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/api:$SHORT_SHA
+  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/web:$SHORT_SHA
