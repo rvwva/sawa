@@ -169,6 +169,105 @@ const ui = {
     loading_results:      "Loading results…",
     overall_score:        "Overall Score",
     subscales_title:      "Subscale Breakdown",
+
+    // ── Admin Panel ───────────────────────────────────────
+    admin_title:          "Platform Admin",
+    admin_dashboard:      "Dashboard",
+    admin_clients:        "Clients",
+    admin_audit:          "Audit Log",
+    admin_sign_out:       "Sign out",
+
+    // Admin dashboard stats
+    admin_stat_orgs:      "Organisations",
+    admin_stat_active:    "Active Cycles",
+    admin_stat_respondents: "Total Respondents",
+    admin_recent_activity: "Recent Activity",
+
+    // Client list
+    admin_clients_title:  "All Clients",
+    admin_new_client:     "New Client",
+    admin_col_client:     "Client",
+    admin_col_industry:   "Industry",
+    admin_col_users:      "Users",
+    admin_col_cycles:     "Cycles",
+    admin_col_participation: "Latest Participation",
+    admin_col_frequency:  "Frequency",
+    admin_no_clients:     "No clients yet. Add your first one.",
+    admin_view:           "Manage",
+
+    // Frequency labels
+    freq_adhoc:           "Ad-hoc",
+    freq_weekly:          "Weekly",
+    freq_monthly:         "Monthly",
+    freq_quarterly:       "Quarterly",
+
+    // New client onboarding
+    admin_onboard_title:  "Onboard New Client",
+    admin_section_org:    "Organisation Details",
+    admin_section_freq:   "Assessment Frequency",
+    admin_section_contact: "Primary HR Contact",
+    admin_field_name_en:  "Name (English)",
+    admin_field_name_ar:  "Name (Arabic)",
+    admin_field_slug:     "URL Slug",
+    admin_field_industry: "Industry",
+    admin_field_size:     "Size Range",
+    admin_field_freq:     "Cycle Frequency",
+    admin_field_fname:    "First Name",
+    admin_field_lname:    "Last Name",
+    admin_field_email:    "Email",
+    admin_field_password: "Temporary Password",
+    admin_create_btn:     "Create Client",
+    admin_creating:       "Creating…",
+    admin_slug_hint:      "Lowercase letters, numbers and hyphens only",
+    admin_freq_hint:      "How often assessment cycles should run for this client",
+
+    // Client detail tabs
+    admin_tab_cycles:     "Cycles",
+    admin_tab_contacts:   "Contacts",
+    admin_tab_settings:   "Settings",
+    admin_back_clients:   "Back to Clients",
+
+    // Cycle management
+    admin_new_cycle:      "New Cycle",
+    admin_cycle_type:     "Assessment Type",
+    admin_cycle_title_f:  "Cycle Title",
+    admin_cycle_starts:   "Start Date",
+    admin_cycle_ends:     "End Date",
+    admin_cycle_emails:   "Employee Emails",
+    admin_cycle_emails_hint: "One email address per line. These are stored for automated reminders.",
+    admin_no_cycles:      "No cycles yet for this client.",
+    admin_create_cycle:   "Create Cycle",
+    admin_creating_cycle: "Creating…",
+
+    // Cycle action buttons
+    admin_act_activate:   "Activate",
+    admin_act_remind:     "Send Reminder",
+    admin_act_close:      "Close Cycle",
+    admin_act_publish:    "Publish Results",
+    admin_act_remind_confirm: "Send reminder to all stored email addresses?",
+    admin_act_close_confirm:  "Close this cycle? This cannot be undone.",
+    admin_respondents_label:  "respondents",
+
+    // Contacts
+    admin_add_contact:    "Add Contact",
+    admin_no_contacts:    "No HR contacts for this client yet.",
+    admin_contact_remove: "Remove",
+    admin_contact_role:   "Role",
+    admin_last_login:     "Last login",
+    admin_never:          "Never",
+    admin_adding:         "Adding…",
+
+    // Settings tab
+    admin_settings_title: "Organisation Settings",
+    admin_save:           "Save Changes",
+    admin_saving:         "Saving…",
+    admin_saved:          "Saved!",
+
+    // General admin
+    admin_loading:        "Loading…",
+    admin_error:          "Something went wrong. Please try again.",
+    admin_confirm:        "Confirm",
+    admin_cancel:         "Cancel",
   },
 
   ar: {
@@ -330,6 +429,95 @@ const ui = {
     loading_results:      "جارٍ تحميل النتائج…",
     overall_score:        "الدرجة الإجمالية",
     subscales_title:      "تفاصيل المقاييس الفرعية",
+
+    // ── Admin Panel ───────────────────────────────────────
+    admin_title:          "إدارة المنصة",
+    admin_dashboard:      "لوحة التحكم",
+    admin_clients:        "العملاء",
+    admin_audit:          "سجل التدقيق",
+    admin_sign_out:       "تسجيل الخروج",
+
+    admin_stat_orgs:      "المؤسسات",
+    admin_stat_active:    "الدورات النشطة",
+    admin_stat_respondents: "إجمالي المشاركين",
+    admin_recent_activity: "النشاط الأخير",
+
+    admin_clients_title:  "جميع العملاء",
+    admin_new_client:     "عميل جديد",
+    admin_col_client:     "العميل",
+    admin_col_industry:   "الصناعة",
+    admin_col_users:      "المستخدمون",
+    admin_col_cycles:     "الدورات",
+    admin_col_participation: "آخر مشاركة",
+    admin_col_frequency:  "التكرار",
+    admin_no_clients:     "لا يوجد عملاء بعد. أضف العميل الأول.",
+    admin_view:           "إدارة",
+
+    freq_adhoc:           "عند الطلب",
+    freq_weekly:          "أسبوعي",
+    freq_monthly:         "شهري",
+    freq_quarterly:       "ربع سنوي",
+
+    admin_onboard_title:  "إضافة عميل جديد",
+    admin_section_org:    "تفاصيل المؤسسة",
+    admin_section_freq:   "تكرار التقييم",
+    admin_section_contact: "جهة اتصال HR الرئيسية",
+    admin_field_name_en:  "الاسم (إنجليزي)",
+    admin_field_name_ar:  "الاسم (عربي)",
+    admin_field_slug:     "معرّف الرابط",
+    admin_field_industry: "الصناعة",
+    admin_field_size:     "حجم المؤسسة",
+    admin_field_freq:     "تكرار الدورة",
+    admin_field_fname:    "الاسم الأول",
+    admin_field_lname:    "اسم العائلة",
+    admin_field_email:    "البريد الإلكتروني",
+    admin_field_password: "كلمة مرور مؤقتة",
+    admin_create_btn:     "إنشاء العميل",
+    admin_creating:       "جارٍ الإنشاء…",
+    admin_slug_hint:      "أحرف صغيرة وأرقام وشرطات فقط",
+    admin_freq_hint:      "عدد الأيام بين الدورات لهذا العميل",
+
+    admin_tab_cycles:     "الدورات",
+    admin_tab_contacts:   "جهات الاتصال",
+    admin_tab_settings:   "الإعدادات",
+    admin_back_clients:   "العودة للعملاء",
+
+    admin_new_cycle:      "دورة جديدة",
+    admin_cycle_type:     "نوع التقييم",
+    admin_cycle_title_f:  "عنوان الدورة",
+    admin_cycle_starts:   "تاريخ البدء",
+    admin_cycle_ends:     "تاريخ الانتهاء",
+    admin_cycle_emails:   "بريد الموظفين",
+    admin_cycle_emails_hint: "بريد إلكتروني واحد في كل سطر. تُخزَّن لإرسال التذكيرات تلقائياً.",
+    admin_no_cycles:      "لا توجد دورات لهذا العميل بعد.",
+    admin_create_cycle:   "إنشاء الدورة",
+    admin_creating_cycle: "جارٍ الإنشاء…",
+
+    admin_act_activate:   "تفعيل",
+    admin_act_remind:     "إرسال تذكير",
+    admin_act_close:      "إغلاق الدورة",
+    admin_act_publish:    "نشر النتائج",
+    admin_act_remind_confirm: "إرسال تذكير لجميع عناوين البريد المخزّنة؟",
+    admin_act_close_confirm:  "إغلاق هذه الدورة؟ لا يمكن التراجع عن هذا.",
+    admin_respondents_label:  "مشارك",
+
+    admin_add_contact:    "إضافة جهة اتصال",
+    admin_no_contacts:    "لا توجد جهات اتصال HR لهذا العميل بعد.",
+    admin_contact_remove: "إزالة",
+    admin_contact_role:   "الدور",
+    admin_last_login:     "آخر تسجيل دخول",
+    admin_never:          "لم يسجّل بعد",
+    admin_adding:         "جارٍ الإضافة…",
+
+    admin_settings_title: "إعدادات المؤسسة",
+    admin_save:           "حفظ التغييرات",
+    admin_saving:         "جارٍ الحفظ…",
+    admin_saved:          "تم الحفظ!",
+
+    admin_loading:        "جارٍ التحميل…",
+    admin_error:          "حدث خطأ ما. يُرجى المحاولة مجدداً.",
+    admin_confirm:        "تأكيد",
+    admin_cancel:         "إلغاء",
   },
 } as const;
 

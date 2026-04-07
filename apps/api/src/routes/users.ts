@@ -59,22 +59,19 @@ usersRouter.get(
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
   async (req: Request, res: Response) => {
-    const where =
+    // ADMIN may scope by ?organisationId=xxx
+    const orgFilter =
       req.user!.role === "ADMIN"
-        ? {}
-        : { organisationId: req.user!.organisationId! };
+        ? (req.query.organisationId as string | undefined)
+        : req.user!.organisationId!;
+
+    const where = orgFilter ? { organisationId: orgFilter } : {};
 
     const users = await prisma.user.findMany({
       where: { ...where, deletedAt: null },
       select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        lastLoginAt: true,
-        organisationId: true,
+        id: true, email: true, firstName: true, lastName: true,
+        role: true, isActive: true, lastLoginAt: true, organisationId: true,
       },
       orderBy: { createdAt: "desc" },
     });
