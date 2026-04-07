@@ -1,17 +1,17 @@
 # Mindlign — Cloud Build CI/CD Pipeline
 # Region: me-central2 (Dammam, Saudi Arabia)
 #
-# Configure these substitutions in the Cloud Build trigger:
+# Substitutions (set in Cloud Build trigger, defaults below are the live values):
 #   _REGION    me-central2
 #   _REPO      mindlign
-#   _API_URL   https://api.yourdomain.com   (or leave as Cloud Run URL)
-#   _WEB_URL   https://app.yourdomain.com   (or leave as Cloud Run URL)
+#   _API_URL   https://api.mindlign.com
+#   _WEB_URL   https://mindlign.com
 
 substitutions:
   _REGION: me-central2
   _REPO: mindlign
-  _API_URL: https://api.example.com   # override in trigger
-  _WEB_URL: https://app.example.com   # override in trigger
+  _API_URL: https://api.mindlign.com
+  _WEB_URL: https://mindlign.com
 
 options:
   logging: CLOUD_LOGGING_ONLY
