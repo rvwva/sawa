@@ -148,10 +148,15 @@ else
 fi
 
 # Application secrets
-secret_or_prompt "mindlign-jwt-secret"          JWT_SECRET          "JWT secret (64 random chars)"
+secret_or_prompt "mindlign-jwt-secret"          JWT_SECRET           "JWT secret (64 random chars)"
 secret_or_prompt "mindlign-refresh-secret"      REFRESH_TOKEN_SECRET "Refresh token secret (64 random chars)"
-secret_or_prompt "mindlign-sendgrid-key"        SENDGRID_API_KEY    "SendGrid API key"
-secret_or_prompt "mindlign-scoring-key"         SCORING_KEY         "Scoring service API key (any random string)"
+secret_or_prompt "mindlign-sendgrid-key"        SENDGRID_API_KEY     "SendGrid API key"
+secret_or_prompt "mindlign-scoring-key"         SCORING_KEY          "Scoring service API key (any random string)"
+
+# Admin user credentials — used by the seed on first boot to create the platform admin
+warn "The admin user is created on first container startup from these credentials."
+secret_or_prompt "mindlign-admin-email"         ADMIN_EMAIL          "Platform admin email (e.g. admin@mindlign.com)"
+secret_or_prompt "mindlign-admin-password"      ADMIN_PASSWORD       "Platform admin password (min 12 chars)"
 
 # ── 4. Service accounts ───────────────────────────────────────────────────────
 step "Service Accounts"

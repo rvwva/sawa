@@ -36,8 +36,10 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder --chown=apiuser:nodejs /app/apps/api/dist              dist/
 # Runtime deps (includes @prisma/client + .prisma/client native binaries)
 COPY --from=builder --chown=apiuser:nodejs /app/node_modules               node_modules/
-# Prisma schema + migration files (needed for migrate deploy at startup)
+# Prisma schema + migrations + seed (needed at startup)
 COPY --from=builder --chown=apiuser:nodejs /app/packages/database/prisma   packages/database/prisma/
+# Scoring definitions (imported by seed.ts for survey schema data)
+COPY --from=builder --chown=apiuser:nodejs /app/packages/scoring/definitions packages/scoring/definitions/
 # Startup script
 COPY --chown=apiuser:nodejs apps/api/docker-entrypoint.sh entrypoint.sh
 RUN chmod +x entrypoint.sh
