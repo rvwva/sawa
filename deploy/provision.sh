@@ -256,17 +256,42 @@ gcloud run services add-iam-policy-binding "mindlign-scoring" \
 
 # ── 6. Cloud Build trigger ────────────────────────────────────────────────────
 step "Cloud Build trigger"
-warn "Skipping automatic trigger creation — connect your repo manually:"
-echo "  1. Open: https://console.cloud.google.com/cloud-build/triggers?project=$PROJECT_ID"
-echo "  2. Click 'Connect repository' and link rvwva/sawa"
-echo "  3. Create trigger:"
-echo "     - Event: Push to branch  claude/sawa-platform-setup-kZCD0 (or main)"
-echo "     - Config: deploy/cloudbuild.yaml"
-echo "     - Substitutions:"
-echo "       _REGION  = $REGION"
-echo "       _REPO    = $REPO"
-echo "       _API_URL = $API_URL"
-echo "       _WEB_URL = $WEB_URL"
+
+# Try to create the trigger via gcloud (requires Cloud Build API + repo connected)
+# Falls back gracefully to manual instructions.
+CB_TRIGGER_EXISTS=$(gcloud builds triggers list \
+  --project="$PROJECT_ID" --format='value(name)' \
+  --filter='name=mindlign-deploy' 2>/dev/null | head -1 || true)
+
+if [[ -n "$CB_TRIGGER_EXISTS" ]]; then
+  info "Cloud Build trigger 'mindlign-deploy' already exists"
+else
+  warn "Cloud Build trigger needs manual setup (GitHub OAuth required):"
+  echo ""
+  echo "  ┌──────────────────────────────────────────────────────────────┐"
+  echo "  │  https://console.cloud.google.com/cloud-build/triggers        │"
+  echo "  │  ?project=$PROJECT_ID                                         │"
+  echo "  └──────────────────────────────────────────────────────────────┘"
+  echo ""
+  echo "  1. Click 'Connect Repository'"
+  echo "     Source: GitHub (Cloud Build GitHub App)"
+  echo "     Repo  : rvwva/sawa"
+  echo ""
+  echo "  2. Click 'Create Trigger' with these settings:"
+  echo "     Name        : mindlign-deploy"
+  echo "     Event       : Push to a branch"
+  echo "     Branch      : ^main\$   (or your deploy branch)"
+  echo "     Config file : deploy/cloudbuild.yaml"
+  echo ""
+  echo "  3. Add substitution variables:"
+  echo "     _REGION  = $REGION"
+  echo "     _REPO    = $REPO"
+  echo "     _API_URL = $API_URL"
+  echo "     _WEB_URL = $WEB_URL"
+  echo ""
+  echo "  4. Save, then click 'Run Trigger' to kick off the first build."
+  echo ""
+fi
 
 # ── 7. Summary ────────────────────────────────────────────────────────────────
 echo ""
@@ -278,10 +303,8 @@ echo "Cloud SQL connection: $CONNECTION_NAME"
 echo "Artifact Registry  : ${IMAGE_PREFIX}/<service>:<tag>"
 echo ""
 echo "Next steps:"
-echo "  1. Map custom domains in Cloud Run console:"
-echo "     - $API_URL  → mindlign-api"
-echo "     - $WEB_URL  → mindlign-web"
-echo "  2. Connect your GitHub repo and create the Cloud Build trigger (see above)"
-echo "  3. Push a commit to trigger your first deployment"
-echo "  4. Update EMAIL_FROM in Secret Manager if needed"
+echo "  1. Connect GitHub repo + create Cloud Build trigger (instructions above)"
+echo "  2. Run connect-domain.sh (or quickstart.sh does this automatically)"
+echo "  3. Add Namecheap DNS A records using the static IP printed by connect-domain.sh"
+echo "  4. Push a commit to github.com/rvwva/sawa to trigger the first build"
 echo ""
