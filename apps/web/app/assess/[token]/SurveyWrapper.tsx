@@ -4,7 +4,7 @@
  * =============
  * Thin wrapper around SurveyJS that:
  *  - Registers the Arabic locale strings
- *  - Applies the Sawa brand theme
+ *  - Applies the Mindlign brand theme
  *  - Switches locale when `lang` changes
  *  - Calls onComplete with the raw data dict
  *
@@ -18,7 +18,7 @@ import "survey-core/defaultV2.min.css";
 import "survey-core/i18n/arabic";
 import type { Lang } from "@/lib/i18n";
 
-const SAWA_THEME = {
+const MINDLIGN_THEME = {
   cssVariables: {
     "--sjs-primary-backcolor":           "#d97c2a",
     "--sjs-primary-backcolor-light":     "#fdf2e6",
@@ -50,7 +50,7 @@ export default function SurveyWrapper({ schema, lang, onComplete }: Props) {
 
   if (!modelRef.current) {
     const model = new Model(schema);
-    model.applyTheme(SAWA_THEME as any);
+    model.applyTheme(MINDLIGN_THEME as any);
     model.showProgressBar  = "top";
     model.progressBarType  = "pages";
     model.showQuestionNumbers = true;

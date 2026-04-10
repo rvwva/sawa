@@ -1,4 +1,4 @@
-// Sawa — Workplace Culture & People Intelligence Platform
+// Mindlign — Workplace Culture & People Intelligence Platform
 // PostgreSQL schema via Prisma ORM
 
 generator client {

@@ -48,6 +48,7 @@ export default function OrganisationsPage() {
   const t    = useTranslations(lang);
   const [orgs, setOrgs]       = useState<OrgRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState("");
   const [search, setSearch]   = useState("");
 
   useEffect(() => {
@@ -55,10 +56,11 @@ export default function OrganisationsPage() {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/organisations`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error("error"); return r.json(); })
       .then((d) => setOrgs(Array.isArray(d) ? d : []))
+      .catch(() => setError(t("admin_error")))
       .finally(() => setLoading(false));
-  }, []);
+  }, []);  // eslint-disable-line
 
   const filtered = orgs.filter((o) => {
     const q = search.toLowerCase();
@@ -96,6 +98,13 @@ export default function OrganisationsPage() {
           className="w-full ps-9 pe-4 py-2.5 rounded-xl border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-brand-400 focus:border-brand-400 outline-none"
         />
       </div>
+
+      {/* Error */}
+      {error && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Table */}
       {loading ? (

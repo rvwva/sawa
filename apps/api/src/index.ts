@@ -73,7 +73,7 @@ app.get("/api/health", async (_req, res) => {
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  logger.info(`Sawa API running on port ${PORT} [${process.env.NODE_ENV}]`);
+  logger.info(`Mindlign API running on port ${PORT} [${process.env.NODE_ENV}]`);
   startScheduler();
 });
 

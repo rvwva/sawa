@@ -1,6 +1,6 @@
 """
-Sawa Scoring Microservice — FastAPI
-====================================
+Mindlign Scoring Microservice — FastAPI
+========================================
 Internal service called by the Node.js API to compute assessment scores.
 Protected by a shared API key (X-Scoring-Key header).
 """
@@ -18,7 +18,7 @@ from who5 import score as score_who5
 from culture import score as score_culture
 
 app = FastAPI(
-    title="Sawa Scoring Service",
+    title="Mindlign Scoring Service",
     version="1.0.0",
     docs_url="/docs" if os.getenv("NODE_ENV") != "production" else None,
 )

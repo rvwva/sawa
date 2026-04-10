@@ -36,15 +36,17 @@ function actionLabel(action: string): string {
     .join(" ");
 }
 
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins  = Math.floor(diff / 60_000);
-  const hours = Math.floor(mins / 60);
-  const days  = Math.floor(hours / 24);
-  if (days > 0)  return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (mins > 0)  return `${mins}m ago`;
-  return "just now";
+function relativeTime(iso: string, lang: "en" | "ar"): string {
+  const rtf  = new Intl.RelativeTimeFormat(lang === "ar" ? "ar" : "en", { numeric: "auto" });
+  const diff = new Date(iso).getTime() - Date.now(); // negative = in the past
+  const secs  = Math.round(diff / 1000);
+  const mins  = Math.round(secs / 60);
+  const hours = Math.round(mins / 60);
+  const days  = Math.round(hours / 24);
+  if (Math.abs(days)  >= 1) return rtf.format(days,  "day");
+  if (Math.abs(hours) >= 1) return rtf.format(hours, "hour");
+  if (Math.abs(mins)  >= 1) return rtf.format(mins,  "minute");
+  return rtf.format(secs, "second");
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -62,7 +64,7 @@ export default function AdminHomePage() {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/dashboard`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error("error"); return r.json(); })
       .then(setData)
       .catch(() => setError(t("admin_error")))
       .finally(() => setLoading(false));
@@ -145,7 +147,7 @@ export default function AdminHomePage() {
                     ? `${log.user.firstName} ${log.user.lastName} · ${log.user.email}`
                     : log.entityType ?? "—"}
                 </span>
-                <span className="text-xs text-gray-400 shrink-0">{relativeTime(log.createdAt)}</span>
+                <span className="text-xs text-gray-400 shrink-0">{relativeTime(log.createdAt, lang)}</span>
               </li>
             ))}
           </ul>

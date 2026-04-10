@@ -281,7 +281,7 @@ export default function DashboardPage() {
 
       const cycleName = cycleResult?.title ?? "dashboard";
       const dateStr   = new Date().toISOString().split("T")[0];
-      pdf.save(`sawa-${cycleName.replace(/\s+/g, "-").toLowerCase()}-${dateStr}.pdf`);
+      pdf.save(`mindlign-${cycleName.replace(/\s+/g, "-").toLowerCase()}-${dateStr}.pdf`);
     } catch (err) {
       console.error("PDF export failed", err);
     } finally {
@@ -575,7 +575,7 @@ function SubscaleRow({ sub, lang }: { sub: SubscaleAgg; lang: Lang }) {
           style={{ width: `${pct}%`, backgroundColor: scoreBarColor(sub.band) }}
         />
       </div>
-      <div className={`w-8 text-right text-sm font-semibold ${bandColor(sub.band)}`}>{pct}</div>
+      <div className={`w-8 text-end text-sm font-semibold ${bandColor(sub.band)}`}>{pct}</div>
       <div className={`hidden sm:block text-xs px-2 py-0.5 rounded-full border font-medium ${bandBg(sub.band)} ${bandColor(sub.band)}`}>
         {translateBand(sub.band, lang)}
       </div>
@@ -829,7 +829,7 @@ function DeptPanel({
                     {t("dept_col_band")}
                   </th>
                   {showExtra && orgSubs.map((s) => (
-                    <th key={s.subscale} className="text-right pb-3 px-2 font-medium text-gray-400 hidden lg:table-cell text-xs">
+                    <th key={s.subscale} className="text-end pb-3 px-2 font-medium text-gray-400 hidden lg:table-cell text-xs">
                       {lang === "ar" ? (subscaleAr[s.subscale] ?? s.label) : s.label}
                     </th>
                   ))}
@@ -919,7 +919,7 @@ function OrgAvgRow({
         </span>
       </td>
       {showExtra && orgSubs.map((s) => (
-        <td key={s.subscale} className="py-3 px-2 text-right hidden lg:table-cell">
+        <td key={s.subscale} className="py-3 px-2 text-end hidden lg:table-cell">
           <span className={`text-xs font-semibold ${bandColor(s.band)}`}>
             {Math.round(s.avg)}
           </span>
@@ -967,11 +967,11 @@ function CyclesTable({
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left px-5 py-3 font-medium text-gray-500">{t("cycle_col_title")}</th>
-                <th className="text-left px-5 py-3 font-medium text-gray-500 hidden md:table-cell">{t("cycle_col_type")}</th>
-                <th className="text-left px-5 py-3 font-medium text-gray-500">{t("cycle_col_status")}</th>
-                <th className="text-left px-5 py-3 font-medium text-gray-500 hidden sm:table-cell">{t("cycle_col_n")}</th>
-                <th className="text-left px-5 py-3 font-medium text-gray-500 hidden lg:table-cell">{t("cycle_col_closes")}</th>
+                <th className="text-start px-5 py-3 font-medium text-gray-500">{t("cycle_col_title")}</th>
+                <th className="text-start px-5 py-3 font-medium text-gray-500 hidden md:table-cell">{t("cycle_col_type")}</th>
+                <th className="text-start px-5 py-3 font-medium text-gray-500">{t("cycle_col_status")}</th>
+                <th className="text-start px-5 py-3 font-medium text-gray-500 hidden sm:table-cell">{t("cycle_col_n")}</th>
+                <th className="text-start px-5 py-3 font-medium text-gray-500 hidden lg:table-cell">{t("cycle_col_closes")}</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
@@ -1000,7 +1000,7 @@ function CyclesTable({
                   <td className="px-5 py-3 text-gray-400 hidden lg:table-cell">
                     {formatDate(cycle.endsAt, lang)}
                   </td>
-                  <td className="px-5 py-3 text-right">
+                  <td className="px-5 py-3 text-end">
                     <button
                       onClick={() => onSelect(cycle.id)}
                       className={`font-medium transition-colors ${

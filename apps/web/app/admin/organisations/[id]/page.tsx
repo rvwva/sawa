@@ -198,7 +198,7 @@ function CyclesTab({
   org, lang, t, reload, authHeader,
 }: { org: OrgDetail; lang: string; t: (k: any) => string; reload: () => void; authHeader: () => Record<string, string> }) {
   const [showForm, setShowForm] = useState(false);
-  const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   // New cycle form state
   const [type,   setType]   = useState("CBI");
@@ -243,7 +243,7 @@ function CyclesTab({
 
       setShowForm(false);
       setTitle(""); setStarts(""); setEnds(""); setEmails(""); setType("CBI");
-      setActionMsg(lang === "ar" ? "تم إنشاء الدورة وتفعيلها." : "Cycle created and activated.");
+      setActionMsg({ text: lang === "ar" ? "تم إنشاء الدورة وتفعيلها." : "Cycle created and activated.", ok: true });
       reload();
     } catch (err: any) {
       setFormErr(err.message);
@@ -260,10 +260,10 @@ function CyclesTab({
       const res = await fetch(endpoint, { method: "PATCH", headers: authHeader() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Action failed");
-      setActionMsg(data.message ?? "Done.");
+      setActionMsg({ text: data.message ?? (lang === "ar" ? "تم." : "Done."), ok: true });
       reload();
     } catch (err: any) {
-      setActionMsg(`Error: ${err.message}`);
+      setActionMsg({ text: err.message, ok: false });
     }
   }
 
@@ -272,10 +272,15 @@ function CyclesTab({
 
       {/* Action message toast */}
       {actionMsg && (
-        <div className="flex items-center gap-3 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm">
-          <span>✓</span>
-          <span className="flex-1">{actionMsg}</span>
-          <button onClick={() => setActionMsg(null)} className="text-green-500 hover:text-green-700">✕</button>
+        <div className={[
+          "flex items-center gap-3 rounded-xl px-4 py-3 text-sm",
+          actionMsg.ok
+            ? "bg-green-50 border border-green-200 text-green-700"
+            : "bg-red-50 border border-red-200 text-red-700",
+        ].join(" ")}>
+          <span>{actionMsg.ok ? "✓" : "✕"}</span>
+          <span className="flex-1">{actionMsg.text}</span>
+          <button onClick={() => setActionMsg(null)} className="opacity-60 hover:opacity-100">✕</button>
         </div>
       )}
 
@@ -415,7 +420,7 @@ function CycleCard({
             </span>
             {hasEmails && (
               <span className="text-green-600">
-                ✓ {cycle.recipientEmails!.length} emails stored
+                ✓ {cycle.recipientEmails!.length} {lang === "ar" ? "بريد مخزّن" : "emails stored"}
               </span>
             )}
           </div>
@@ -576,7 +581,9 @@ function ContactsTab({
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-start px-5 py-3 font-medium text-gray-500">Name</th>
+                <th className="text-start px-5 py-3 font-medium text-gray-500">
+                {lang === "ar" ? "الاسم" : "Name"}
+              </th>
                 <th className="text-start px-5 py-3 font-medium text-gray-500 hidden sm:table-cell">{t("admin_contact_role")}</th>
                 <th className="text-start px-5 py-3 font-medium text-gray-500 hidden md:table-cell">{t("admin_last_login")}</th>
                 <th className="px-5 py-3" />

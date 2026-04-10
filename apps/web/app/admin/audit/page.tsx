@@ -48,8 +48,9 @@ export default function AuditPage() {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/audit-log?page=${page}&limit=${LIMIT}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error("error"); return r.json(); })
       .then((d) => { setLogs(d.logs ?? []); setTotal(d.total ?? 0); })
+      .catch(() => { setLogs([]); setTotal(0); })
       .finally(() => setLoading(false));
   }, [page]);
 
@@ -70,18 +71,28 @@ export default function AuditPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500" />
           </div>
         ) : logs.length === 0 ? (
-          <p className="p-10 text-center text-sm text-gray-400">No audit logs yet.</p>
+          <p className="p-10 text-center text-sm text-gray-400">
+            {lang === "ar" ? "لا توجد سجلات بعد." : "No audit logs yet."}
+          </p>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="text-start px-5 py-3 font-medium text-gray-500">Action</th>
-                    <th className="text-start px-5 py-3 font-medium text-gray-500 hidden md:table-cell">User</th>
-                    <th className="text-start px-5 py-3 font-medium text-gray-500 hidden lg:table-cell">Entity</th>
+                    <th className="text-start px-5 py-3 font-medium text-gray-500">
+                      {lang === "ar" ? "الإجراء" : "Action"}
+                    </th>
+                    <th className="text-start px-5 py-3 font-medium text-gray-500 hidden md:table-cell">
+                      {lang === "ar" ? "المستخدم" : "User"}
+                    </th>
+                    <th className="text-start px-5 py-3 font-medium text-gray-500 hidden lg:table-cell">
+                      {lang === "ar" ? "الكيان" : "Entity"}
+                    </th>
                     <th className="text-start px-5 py-3 font-medium text-gray-500 hidden lg:table-cell">IP</th>
-                    <th className="text-start px-5 py-3 font-medium text-gray-500">Time</th>
+                    <th className="text-start px-5 py-3 font-medium text-gray-500">
+                      {lang === "ar" ? "الوقت" : "Time"}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -99,7 +110,9 @@ export default function AuditPage() {
                             <p className="text-xs text-gray-400">{log.user.email}</p>
                           </div>
                         ) : (
-                          <span className="text-gray-300 text-xs">Anonymous</span>
+                          <span className="text-gray-300 text-xs">
+                            {lang === "ar" ? "مجهول" : "Anonymous"}
+                          </span>
                         )}
                       </td>
                       <td className="px-5 py-3 text-xs text-gray-400 hidden lg:table-cell">

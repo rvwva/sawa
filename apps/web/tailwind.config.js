@@ -7,7 +7,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Sawa brand palette — inspired by KSA desert tones + professionalism
+        // Mindlign brand palette — inspired by KSA desert tones + professionalism
         brand: {
           50:  "#fdf6ee",
           100: "#faebd7",
