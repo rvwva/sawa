@@ -273,7 +273,7 @@ async function main() {
       where: { organisationId: org.id, title: data.title },
     });
     return existing ?? await prisma.assessmentCycle.create({
-      data: { organisationId: org.id, assessmentId: cbi.id, ...data },
+      data: { organisationId: org.id, assessmentId: cbi!.id, ...data },
     });
   }
 

@@ -17,11 +17,11 @@
   "dependencies": {
     "@prisma/client": "^5.10.2",
     "bcryptjs": "^2.4.3",
+    "prisma": "^5.10.2",
     "tsx": "^4.7.1"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "prisma": "^5.10.2"
+    "@types/bcryptjs": "^2.4.6"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
