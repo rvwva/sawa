@@ -1,0 +1,23 @@
+# Railway service config — Mindlign Web
+# =======================================
+# In the Railway dashboard, for this service:
+#   Source     : GitHub repo  rvwva/sawa
+#   Root Dir   : (leave blank — must be repo root so Docker can reach packages/)
+#   Config Path: apps/web/railway.toml      ← set this explicitly
+#
+# IMPORTANT — build-time variables (baked into the Next.js bundle):
+#   NEXT_PUBLIC_API_URL   = https://<your-api-service>.railway.app
+#   NEXT_PUBLIC_APP_URL   = https://<your-web-service>.railway.app
+#
+# Set these as Railway service variables BEFORE the first deploy so they are
+# available during `next build`. Changing them requires a rebuild.
+
+[build]
+builder        = "DOCKERFILE"
+dockerfilePath = "apps/web/Dockerfile"
+watchPatterns  = ["apps/web/**"]
+
+[deploy]
+numReplicas          = 1
+restartPolicyType    = "ON_FAILURE"
+restartPolicyMaxRetries = 10

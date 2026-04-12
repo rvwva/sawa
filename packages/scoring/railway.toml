@@ -1,0 +1,21 @@
+# Railway service config — Mindlign Scoring
+# ==========================================
+# In the Railway dashboard, for this service:
+#   Source     : GitHub repo  rvwva/sawa
+#   Root Dir   : (leave blank — must be repo root)
+#   Config Path: packages/scoring/railway.toml    ← set this explicitly
+#
+# No environment variables required for the scoring service itself.
+# The API authenticates calls with an internal bearer token (SCORING_KEY).
+# Set SCORING_KEY on the API service; the scoring service reads it via the
+# X-Scoring-Key header (see packages/scoring/main.py).
+
+[build]
+builder        = "DOCKERFILE"
+dockerfilePath = "packages/scoring/Dockerfile"
+watchPatterns  = ["packages/scoring/**"]
+
+[deploy]
+numReplicas          = 1
+restartPolicyType    = "ON_FAILURE"
+restartPolicyMaxRetries = 10

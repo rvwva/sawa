@@ -1,0 +1,27 @@
+# Railway service config — Mindlign API
+# =======================================
+# In the Railway dashboard, for this service:
+#   Source     : GitHub repo  rvwva/sawa
+#   Root Dir   : (leave blank — must be repo root so Docker can reach packages/)
+#   Config Path: apps/api/railway.toml      ← set this explicitly
+#
+# Environment variables to set in Railway:
+#   DATABASE_URL          (auto-set by Railway Postgres plugin)
+#   JWT_SECRET            (generate: openssl rand -base64 48 | tr -dc A-Za-z0-9 | head -c 64)
+#   REFRESH_TOKEN_SECRET  (generate same way)
+#   SCORING_SERVICE_URL   (Railway internal URL of the scoring service)
+#   SENDGRID_API_KEY      (from SendGrid dashboard)
+#   ADMIN_EMAIL           (your platform admin login)
+#   ADMIN_PASSWORD        (min 12 chars)
+#   NODE_ENV              production
+#   PORT                  4000
+
+[build]
+builder       = "DOCKERFILE"
+dockerfilePath = "apps/api/Dockerfile"
+watchPatterns = ["apps/api/**", "packages/database/**", "packages/scoring/definitions/**"]
+
+[deploy]
+numReplicas          = 1
+restartPolicyType    = "ON_FAILURE"
+restartPolicyMaxRetries = 10

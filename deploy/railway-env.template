@@ -1,0 +1,29 @@
+# ============================================================
+# Mindlign — Railway Environment Variables Template
+# ============================================================
+# Copy each section into the correct Railway service's Variables tab.
+# Generate secrets with: openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 64
+# ============================================================
+
+# ── API service ──────────────────────────────────────────────
+DATABASE_URL=postgresql://...          # auto-provided by Railway Postgres plugin
+JWT_SECRET=<64-char random string>
+REFRESH_TOKEN_SECRET=<64-char random string>
+SCORING_KEY=<32-char random string>
+SCORING_SERVICE_URL=https://<scoring-service>.railway.app
+SENDGRID_API_KEY=SG.xxxxxxxxxxxxx
+ADMIN_EMAIL=admin@yourcompany.com
+ADMIN_PASSWORD=<min 12 chars>
+NODE_ENV=production
+PORT=4000
+
+# ── Web service ──────────────────────────────────────────────
+# These are baked into the Next.js bundle at build time.
+# Set BEFORE the first deploy. Changing them requires a redeploy.
+NEXT_PUBLIC_API_URL=https://<api-service>.railway.app
+NEXT_PUBLIC_APP_URL=https://<web-service>.railway.app
+PORT=3000
+
+# ── Scoring service ──────────────────────────────────────────
+# No variables needed — the scoring service is stateless.
+# (SCORING_KEY is verified on the API side, not the scoring side.)
