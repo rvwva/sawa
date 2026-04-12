@@ -11,8 +11,9 @@ COPY apps/api/package.json           apps/api/
 RUN npm ci --workspace=apps/api --workspace=packages/database
 
 # Copy source
-COPY packages/database packages/database
-COPY apps/api           apps/api
+COPY packages/database               packages/database
+COPY packages/scoring/definitions    packages/scoring/definitions
+COPY apps/api                        apps/api
 
 # Generate Prisma client (requires schema, not a DB connection)
 RUN node_modules/.bin/prisma generate \
