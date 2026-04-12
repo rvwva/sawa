@@ -21,6 +21,8 @@ ARG NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 
+COPY package.json package-lock.json ./
+COPY apps/web/package.json apps/web/
 COPY --from=deps /app/node_modules node_modules/
 COPY apps/web apps/web
 
