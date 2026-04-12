@@ -9,6 +9,7 @@
  * Start by calling startScheduler() once at server boot.
  */
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { sendCycleReminder } from "./email";
 import { logger } from "../lib/logger";
@@ -29,7 +30,7 @@ async function checkReminders(): Promise<void> {
     where: {
       status: "ACTIVE",
       endsAt: { gt: now },
-      recipientEmails: { not: null },
+      recipientEmails: { not: Prisma.DbNull },
     },
     include: {
       assessment:   { select: { name: true, nameAr: true } },

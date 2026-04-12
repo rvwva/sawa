@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { AuditAction } from "@prisma/client";
+import { AuditAction, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
 
@@ -24,7 +24,7 @@ export async function auditLog(
         userId: options.userId ?? null,
         entityType: options.entityType ?? null,
         entityId: options.entityId ?? null,
-        metadata: options.metadata ?? undefined,
+        metadata: options.metadata as Prisma.InputJsonValue | undefined,
         ipAddress: options.req
           ? (options.req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ??
             options.req.socket.remoteAddress ??

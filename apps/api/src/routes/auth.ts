@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import type { StringValue } from "ms";
 import { body, validationResult } from "express-validator";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
@@ -17,10 +18,10 @@ const loginValidation = [
 function issueTokens(userId: string, email: string, role: string, organisationId: string | null) {
   const payload = { userId, email, role, organisationId };
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {
-    expiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
+    expiresIn: (process.env.JWT_EXPIRES_IN ?? "8h") as StringValue,
   });
   const refreshToken = jwt.sign({ userId }, process.env.REFRESH_TOKEN_SECRET!, {
-    expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN ?? "30d",
+    expiresIn: (process.env.REFRESH_TOKEN_EXPIRES_IN ?? "30d") as StringValue,
   });
   return { accessToken, refreshToken };
 }
