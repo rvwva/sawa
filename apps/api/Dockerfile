@@ -3,10 +3,10 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy workspace manifests first so Docker can cache the npm ci layer
-COPY package*.json ./
-COPY packages/database/package*.json packages/database/
-COPY apps/api/package*.json           apps/api/
+# Copy workspace manifests + lock file first so Docker can cache the npm ci layer
+COPY package.json package-lock.json ./
+COPY packages/database/package.json packages/database/
+COPY apps/api/package.json           apps/api/
 
 RUN npm ci --workspace=apps/api --workspace=packages/database
 
