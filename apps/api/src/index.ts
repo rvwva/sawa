@@ -20,6 +20,7 @@ import { checkDatabaseConnection } from "./lib/prisma";
 import { startScheduler } from "./services/scheduler";
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = parseInt(process.env.API_PORT ?? "4000", 10);
 
 // ─── Security & parsing ────────────────────────────────────────────────────
