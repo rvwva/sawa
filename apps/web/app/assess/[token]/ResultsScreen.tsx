@@ -1,4 +1,5 @@
 "use client";
+import { API_BASE } from "@/lib/api";
 import { useEffect, useState } from "react";
 import type { Lang } from "@/lib/i18n";
 import { useTranslations, translateBand } from "@/lib/i18n";
@@ -175,7 +176,7 @@ export default function ResultsScreen({
 
   // Fetch comparison data (org avg + dept avg)
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/responses/my-score/${sessionToken}`)
+    fetch(`${API_BASE}/responses/my-score/${sessionToken}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.orgAverage)  setComparison(data.orgAverage);
@@ -427,7 +428,7 @@ export default function ResultsScreen({
                       );
                       if (!confirmed) return;
                       setDeleteState("pending");
-                      fetch(`${process.env.NEXT_PUBLIC_API_URL}/data-rights/delete`, {
+                      fetch(`${API_BASE}/data-rights/delete`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ sessionToken }),

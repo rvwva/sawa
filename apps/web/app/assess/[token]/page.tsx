@@ -1,4 +1,5 @@
 "use client";
+import { API_BASE } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import type { Lang } from "@/lib/i18n";
@@ -118,7 +119,7 @@ export default function AssessmentPage() {
   const t = useTranslations(lang);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/assessments/cycles/by-token/${token}`)
+    fetch(`${API_BASE}/assessments/cycles/by-token/${token}`)
       .then(async (res) => {
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));

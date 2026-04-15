@@ -1,4 +1,5 @@
 "use client";
+import { API_BASE } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useAdminLang } from "../context";
 import { useTranslations } from "@/lib/i18n";
@@ -45,7 +46,7 @@ export default function AuditPage() {
   useEffect(() => {
     setLoading(true);
     const token = localStorage.getItem("mindlign_token");
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/audit-log?page=${page}&limit=${LIMIT}`, {
+    fetch(`${API_BASE}/admin/audit-log?page=${page}&limit=${LIMIT}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => { if (!r.ok) throw new Error("error"); return r.json(); })

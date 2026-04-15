@@ -1,4 +1,5 @@
 "use client";
+import { API_BASE } from "@/lib/api";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdminLang } from "./context";
@@ -61,7 +62,7 @@ export default function AdminHomePage() {
 
   useEffect(() => {
     const token = localStorage.getItem("mindlign_token");
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/dashboard`, {
+    fetch(`${API_BASE}/admin/dashboard`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => { if (!r.ok) throw new Error("error"); return r.json(); })

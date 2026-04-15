@@ -1,4 +1,5 @@
 "use client";
+import { API_BASE } from "@/lib/api";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdminLang } from "../context";
@@ -53,7 +54,7 @@ export default function OrganisationsPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("mindlign_token");
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/organisations`, {
+    fetch(`${API_BASE}/admin/organisations`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => { if (!r.ok) throw new Error("error"); return r.json(); })

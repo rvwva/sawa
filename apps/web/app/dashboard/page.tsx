@@ -1,4 +1,5 @@
 "use client";
+import { API_BASE } from "@/lib/api";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -179,8 +180,8 @@ export default function DashboardPage() {
     const headers = { Authorization: `Bearer ${token}` };
 
     Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/reports/dashboard/${u.organisationId}`, { headers }).then((r) => r.ok ? r.json() : null),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/assessments/cycles?organisationId=${u.organisationId}`, { headers }).then((r) => r.ok ? r.json() : []),
+      fetch(`${API_BASE}/reports/dashboard/${u.organisationId}`, { headers }).then((r) => r.ok ? r.json() : null),
+      fetch(`${API_BASE}/assessments/cycles?organisationId=${u.organisationId}`, { headers }).then((r) => r.ok ? r.json() : []),
     ])
       .then(([s, c]) => {
         if (s) setStats(s);
@@ -209,7 +210,7 @@ export default function DashboardPage() {
     setRateData(null);
     setDetailError("");
 
-    const base = `${process.env.NEXT_PUBLIC_API_URL}/results/cycle/${selectedId}`;
+    const base = `${API_BASE}/results/cycle/${selectedId}`;
 
     Promise.all([
       fetch(base, { headers }).then((r) => { if (!r.ok) throw new Error("cycle"); return r.json(); }),
@@ -237,7 +238,7 @@ export default function DashboardPage() {
     const token = localStorage.getItem("mindlign_token");
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
-    const base = `${process.env.NEXT_PUBLIC_API_URL}/results/cycle/${selectedId}`;
+    const base = `${API_BASE}/results/cycle/${selectedId}`;
 
     const id = setInterval(() => {
       fetch(`${base}/response-rate`, { headers })

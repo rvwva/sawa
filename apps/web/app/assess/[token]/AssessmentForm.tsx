@@ -1,4 +1,5 @@
 "use client";
+import { API_BASE } from "@/lib/api";
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { Lang } from "@/lib/i18n";
@@ -38,7 +39,7 @@ export default function AssessmentForm({
   // Fetch schema, transform to bilingual
   useEffect(() => {
     fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/assessments/${cycleInfo.assessment.type}/schema`
+      `${API_BASE}/assessments/${cycleInfo.assessment.type}/schema`
     )
       .then((r) => {
         if (!r.ok) throw new Error("schema fetch failed");
@@ -58,7 +59,7 @@ export default function AssessmentForm({
     setSubmitting(true);
     setSubmitError("");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/responses/submit`, {
+      const res = await fetch(`${API_BASE}/responses/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

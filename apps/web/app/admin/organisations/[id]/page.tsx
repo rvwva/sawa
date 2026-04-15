@@ -1,4 +1,5 @@
 "use client";
+import { API_BASE } from "@/lib/api";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -96,7 +97,7 @@ export default function OrgDetailPage() {
   const loadOrg = useCallback(() => {
     const token = localStorage.getItem("mindlign_token");
     if (!token) { router.push("/login"); return; }
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/organisations/${id}`, {
+    fetch(`${API_BASE}/admin/organisations/${id}`, {
       headers: authHeader(),
     })
       .then((r) => {
@@ -214,7 +215,7 @@ function CyclesTab({
     setFormErr("");
     setCreating(true);
 
-    const base = process.env.NEXT_PUBLIC_API_URL;
+    const base = API_BASE;
     const emailList = emails.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
 
     try {
@@ -254,7 +255,7 @@ function CyclesTab({
 
   async function cycleAction(cycleId: string, action: "remind" | "close" | "publish", confirmMsg: string) {
     if (!window.confirm(confirmMsg)) return;
-    const base = process.env.NEXT_PUBLIC_API_URL;
+    const base = API_BASE;
     const endpoint = `${base}/assessments/cycles/${cycleId}/${action}`;
     try {
       const res = await fetch(endpoint, { method: "PATCH", headers: authHeader() });
@@ -488,7 +489,7 @@ function ContactsTab({
     e.preventDefault();
     setErr(""); setAdding(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`, {
+      const res = await fetch(`${API_BASE}/users`, {
         method: "POST",
         headers: authHeader(),
         body: JSON.stringify({
@@ -511,7 +512,7 @@ function ContactsTab({
 
   async function removeUser(userId: string) {
     if (!window.confirm(lang === "ar" ? "إزالة هذا المستخدم؟" : "Remove this user?")) return;
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${userId}`, {
+    const res = await fetch(`${API_BASE}/users/${userId}`, {
       method: "DELETE",
       headers: authHeader(),
     });
@@ -644,7 +645,7 @@ function SettingsTab({
     e.preventDefault();
     setErr(""); setSaved(false); setSaving(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/organisations/${org.id}`, {
+      const res = await fetch(`${API_BASE}/admin/organisations/${org.id}`, {
         method: "PATCH",
         headers: authHeader(),
         body: JSON.stringify({

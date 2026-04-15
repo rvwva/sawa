@@ -1,4 +1,5 @@
 "use client";
+import { API_BASE } from "@/lib/api";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -86,7 +87,7 @@ export default function NewClientPage() {
       Authorization:  `Bearer ${token}`,
       "Content-Type": "application/json",
     };
-    const base = process.env.NEXT_PUBLIC_API_URL;
+    const base = API_BASE;
 
     try {
       // 1. Create organisation
