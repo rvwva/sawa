@@ -27,7 +27,10 @@ const PORT = parseInt(process.env.API_PORT ?? "4000", 10);
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+    origin: [
+      process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+      "https://web-service-production-a431.up.railway.app",
+    ],
     credentials: true,
   })
 );
