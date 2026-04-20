@@ -1,6 +1,7 @@
 "use client";
 import { API_BASE } from "@/lib/api";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAdminLang } from "./context";
 import { useTranslations } from "@/lib/i18n";
@@ -53,8 +54,9 @@ function relativeTime(iso: string, lang: "en" | "ar"): string {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminHomePage() {
-  const lang = useAdminLang();
-  const t    = useTranslations(lang);
+  const lang   = useAdminLang();
+  const t      = useTranslations(lang);
+  const router = useRouter();
 
   const [data, setData]       = useState<DashData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,9 +67,18 @@ export default function AdminHomePage() {
     fetch(`${API_BASE}/admin/dashboard`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => { if (!r.ok) throw new Error("error"); return r.json(); })
+      .then((r) => {
+        if (r.status === 401 || r.status === 403) {
+          localStorage.removeItem("mindlign_token");
+          localStorage.removeItem("mindlign_user");
+          router.push("/login");
+          throw new Error("auth");
+        }
+        if (!r.ok) throw new Error("error");
+        return r.json();
+      })
       .then(setData)
-      .catch(() => setError(t("admin_error")))
+      .catch((e) => { if (e.message !== "auth") setError(t("admin_error")); })
       .finally(() => setLoading(false));
   }, []);  // eslint-disable-line
 
