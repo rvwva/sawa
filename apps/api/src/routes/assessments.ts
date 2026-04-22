@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { body, validationResult } from "express-validator";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
@@ -169,51 +169,56 @@ assessmentsRouter.patch(
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
   [body("recipientEmails").optional().isArray()],
-  async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const cycle = await prisma.assessmentCycle.findUnique({
-      where:   { id: req.params.id },
-      include: { assessment: true, organisation: true },
-    });
-    if (!cycle)                 return res.status(404).json({ error: "Cycle not found" });
-    if (cycle.status !== "ACTIVE") return res.status(409).json({ error: "Only ACTIVE cycles can send reminders" });
-    if (req.user!.role === "EXECUTIVE" && cycle.organisationId !== req.user!.organisationId)
-      return res.status(403).json({ error: "Access denied" });
+      const cycle = await prisma.assessmentCycle.findUnique({
+        where:   { id: req.params.id },
+        include: { assessment: true, organisation: true },
+      });
+      if (!cycle)                 return res.status(404).json({ error: "Cycle not found" });
+      if (cycle.status !== "ACTIVE") return res.status(409).json({ error: "Only ACTIVE cycles can send reminders" });
+      if (req.user!.role === "EXECUTIVE" && cycle.organisationId !== req.user!.organisationId)
+        return res.status(403).json({ error: "Access denied" });
 
-    // Use supplied list or fall back to stored list
-    const emails: string[] =
-      (req.body.recipientEmails && req.body.recipientEmails.length > 0)
-        ? req.body.recipientEmails
-        : (cycle.recipientEmails as string[] | null) ?? [];
+      const emails: string[] =
+        (req.body.recipientEmails && req.body.recipientEmails.length > 0)
+          ? req.body.recipientEmails
+          : (cycle.recipientEmails as string[] | null) ?? [];
 
-    if (emails.length === 0)
-      return res.status(400).json({ error: "No recipient emails available" });
+      if (emails.length === 0)
+        return res.status(400).json({ error: "No recipient emails available" });
 
-    const daysRemaining = Math.ceil(
-      (cycle.endsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-    );
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const daysRemaining = Math.ceil(
+        (cycle.endsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      );
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-    await sendCycleReminder({
-      recipientEmails:    emails,
-      organisationName:   cycle.organisation.name,
-      organisationNameAr: cycle.organisation.nameAr ?? undefined,
-      assessmentName:     cycle.assessment.name,
-      assessmentNameAr:   cycle.assessment.nameAr ?? undefined,
-      cycleTitle:         cycle.title,
-      assessmentUrl:      `${appUrl}/assess/${cycle.linkToken}`,
-      endsAt:             cycle.endsAt,
-      daysRemaining,
-    });
+      // Record send time immediately, then fire email non-blocking (same
+      // pattern as activate/publish — don't block the response on SendGrid).
+      await prisma.assessmentCycle.update({
+        where: { id: cycle.id },
+        data:  { reminderSentAt: new Date() },
+      });
 
-    await prisma.assessmentCycle.update({
-      where: { id: cycle.id },
-      data:  { reminderSentAt: new Date() },
-    });
+      sendCycleReminder({
+        recipientEmails:    emails,
+        organisationName:   cycle.organisation.name,
+        organisationNameAr: cycle.organisation.nameAr ?? undefined,
+        assessmentName:     cycle.assessment.name,
+        assessmentNameAr:   cycle.assessment.nameAr ?? undefined,
+        cycleTitle:         cycle.title,
+        assessmentUrl:      `${appUrl}/assess/${cycle.linkToken}`,
+        endsAt:             cycle.endsAt,
+        daysRemaining,
+      }).catch((err) => logger.error("sendCycleReminder failed", { err }));
 
-    return res.json({ message: `Reminder sent to ${emails.length} recipients` });
+      return res.json({ message: `Reminder sent to ${emails.length} recipients` });
+    } catch (err) {
+      next(err);
+    }
   }
 );
 
@@ -388,5 +393,32 @@ assessmentsRouter.get(
       organisation: org,
       departments,
     });
+  }
+);
+
+// ─── GET /api/assessments/cycles/:id — admin cycle detail ────────────────────
+// Must be registered AFTER /cycles/by-token/:token to avoid shadowing.
+
+assessmentsRouter.get(
+  "/cycles/:id",
+  requireAuth,
+  requireRole("ADMIN", "EXECUTIVE"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cycle = await prisma.assessmentCycle.findUnique({
+        where: { id: req.params.id },
+        include: {
+          assessment: { select: { type: true, name: true, nameAr: true } },
+          organisation: { select: { id: true, name: true, nameAr: true } },
+          _count: { select: { respondents: true } },
+        },
+      });
+      if (!cycle) return res.status(404).json({ error: "Cycle not found" });
+      if (req.user!.role === "EXECUTIVE" && cycle.organisationId !== req.user!.organisationId)
+        return res.status(403).json({ error: "Access denied" });
+      return res.json(cycle);
+    } catch (err) {
+      next(err);
+    }
   }
 );

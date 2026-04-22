@@ -37,6 +37,7 @@ type Cycle = {
   status:              "DRAFT" | "ACTIVE" | "CLOSED" | "ARCHIVED";
   startsAt:            string;
   endsAt:              string;
+  linkToken:           string;
   resultsPublishedAt?: string | null;
   recipientEmails?:    string[] | null;
   assessment:          { type: string; name: string; nameAr: string | null };
@@ -375,6 +376,7 @@ function CyclesTab({
               cycle={cycle}
               lang={lang}
               t={t}
+              orgId={org.id}
               onRemind={() => cycleAction(cycle.id, "remind", t("admin_act_remind_confirm"))}
               onClose={() => cycleAction(cycle.id, "close", t("admin_act_close_confirm"))}
               onPublish={() => cycleAction(cycle.id, "publish", lang === "ar" ? "نشر النتائج للمشاركين؟" : "Publish results to all participants?")}
@@ -389,22 +391,24 @@ function CyclesTab({
 // ─── Cycle card ───────────────────────────────────────────────────────────────
 
 function CycleCard({
-  cycle, lang, t, onRemind, onClose, onPublish,
+  cycle, lang, t, orgId, onRemind, onClose, onPublish,
 }: {
   cycle:     Cycle;
   lang:      string;
   t:         (k: any) => string;
+  orgId:     string;
   onRemind:  () => void;
   onClose:   () => void;
   onPublish: () => void;
 }) {
   const status   = cycle.status;
   const hasEmails = (cycle.recipientEmails?.length ?? 0) > 0;
+  const detailHref = `/admin/organisations/${orgId}/cycles/${cycle.id}`;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
+        <Link href={detailHref} className="flex-1 min-w-0 group">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[status]}`}>
               {lang === "ar" ? (STATUS_AR[status] ?? status) : status}
@@ -413,7 +417,9 @@ function CycleCard({
               {lang === "ar" && cycle.assessment.nameAr ? cycle.assessment.nameAr : cycle.assessment.name}
             </span>
           </div>
-          <h3 className="font-semibold text-gray-900 mt-2 truncate">{cycle.title}</h3>
+          <h3 className="font-semibold text-gray-900 mt-2 truncate group-hover:text-brand-600 transition-colors">
+            {cycle.title}
+          </h3>
           <div className="flex flex-wrap items-center gap-4 mt-1.5 text-xs text-gray-400">
             <span>{fmtDate(cycle.startsAt)} → {fmtDate(cycle.endsAt)}</span>
             <span className="font-medium text-gray-600">
@@ -425,7 +431,7 @@ function CycleCard({
               </span>
             )}
           </div>
-        </div>
+        </Link>
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2 shrink-0">
