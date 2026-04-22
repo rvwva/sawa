@@ -280,14 +280,15 @@ export default function NewClientPage() {
               </Field>
               <Field
                 label={t("admin_field_password")}
-                hint={lang === "ar" ? "10 أحرف على الأقل" : "Minimum 10 characters"}
+                hint={lang === "ar" ? "8 أحرف على الأقل" : "Minimum 8 characters"}
               >
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={INPUT}
-                  placeholder="••••••••••"
+                  placeholder="••••••••"
+                  minLength={8}
                 />
               </Field>
             </div>
