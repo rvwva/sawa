@@ -43,7 +43,6 @@ export const CBI_SURVEY_SCHEMA = {
   logoPosition: "right",
   showProgressBar: "top",
   showQuestionNumbers: "on",
-  questionsOnPageMode: "singlePage",
   pages: [
     {
       name: "personal_burnout",

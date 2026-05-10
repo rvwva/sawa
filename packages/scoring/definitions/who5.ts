@@ -24,7 +24,6 @@ export const WHO5_SURVEY_SCHEMA = {
   logoPosition: "right",
   showProgressBar: "top",
   showQuestionNumbers: "on",
-  questionsOnPageMode: "singlePage",
   pages: [
     {
       name: "who5",

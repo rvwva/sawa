@@ -53,7 +53,7 @@ export default function SurveyWrapper({ schema, lang, onComplete }: Props) {
     model.applyTheme(MINDLIGN_THEME as any);
     model.showProgressBar  = "top";
     model.progressBarType  = "pages";
-    model.showQuestionNumbers = true;
+    model.showQuestionNumbers = "on";
     model.widthMode = "responsive";
     // Prevent the built-in "completed" page — we handle it ourselves
     model.showCompletedPage = false;

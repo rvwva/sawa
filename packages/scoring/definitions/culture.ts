@@ -37,7 +37,6 @@ export const CULTURE_SURVEY_SCHEMA = {
   logoPosition: "right",
   showProgressBar: "top",
   showQuestionNumbers: "on",
-  questionsOnPageMode: "singlePage",
   pages: [
     {
       name: "leadership",
