@@ -1,5 +1,5 @@
 "use client";
-import { API_BASE, getWebBase } from "@/lib/api";
+import { API_BASE } from "@/lib/api";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -96,7 +96,7 @@ export default function CycleDetailPage() {
 
   function copyLink() {
     if (!cycle) return;
-    navigator.clipboard.writeText(`${getWebBase()}/assess/${cycle.linkToken}`).then(() => {
+    navigator.clipboard.writeText(`${window.location.origin}/assess/${cycle.linkToken}`).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -119,7 +119,7 @@ export default function CycleDetailPage() {
   if (!cycle) return null;
 
   const hasEmails = (cycle.recipientEmails?.length ?? 0) > 0;
-  const assessUrl = `${getWebBase()}/assess/${cycle.linkToken}`;
+  const assessUrl = `${window.location.origin}/assess/${cycle.linkToken}`;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
