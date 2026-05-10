@@ -12,7 +12,7 @@
  *   GET /api/results/cycle/:cycleId/export      — full data export (audit-logged)
  */
 
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { requireRole, requireOrgAccess } from "../middleware/rbac";
@@ -66,39 +66,40 @@ resultsRouter.get(
   "/cycle/:cycleId",
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
-  async (req: Request, res: Response) => {
-    const cycle = await resolveCycle(req.params.cycleId, req, res);
-    if (!cycle) return;
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cycle = await resolveCycle(req.params.cycleId, req, res);
+      if (!cycle) return;
 
-    const agg = await aggregateCycleScores(cycle.id);
+      const agg = await aggregateCycleScores(cycle.id);
 
-    if (!agg || agg.respondentCount === 0) {
+      if (!agg || agg.respondentCount === 0) {
+        return res.json({
+          cycleId: cycle.id,
+          title: cycle.title,
+          status: cycle.status,
+          assessment: cycle.assessment,
+          organisation: cycle.organisation,
+          respondentCount: 0,
+          subscales: [],
+          message: "No submissions yet for this cycle.",
+        });
+      }
+
       return res.json({
         cycleId: cycle.id,
         title: cycle.title,
         status: cycle.status,
+        startsAt: cycle.startsAt,
+        endsAt: cycle.endsAt,
+        closedAt: cycle.closedAt,
         assessment: cycle.assessment,
         organisation: cycle.organisation,
-        respondentCount: 0,
-        subscales: [],
-        message: "No submissions yet for this cycle.",
+        respondentCount: agg.respondentCount,
+        subscales: agg.subscales,
+        overall: agg.subscales.find((s) => s.subscale === "total") ?? null,
       });
-    }
-
-    return res.json({
-      cycleId: cycle.id,
-      title: cycle.title,
-      status: cycle.status,
-      startsAt: cycle.startsAt,
-      endsAt: cycle.endsAt,
-      closedAt: cycle.closedAt,
-      assessment: cycle.assessment,
-      organisation: cycle.organisation,
-      respondentCount: agg.respondentCount,
-      subscales: agg.subscales,
-      // Top-level "total" subscale pulled out for quick display
-      overall: agg.subscales.find((s) => s.subscale === "total") ?? null,
-    });
+    } catch (err) { next(err); }
   }
 );
 
@@ -110,29 +111,31 @@ resultsRouter.get(
   "/cycle/:cycleId/departments",
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
-  async (req: Request, res: Response) => {
-    const cycle = await resolveCycle(req.params.cycleId, req, res);
-    if (!cycle) return;
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cycle = await resolveCycle(req.params.cycleId, req, res);
+      if (!cycle) return;
 
-    const [orgAgg, deptAggs] = await Promise.all([
-      aggregateCycleScores(cycle.id),
-      aggregateDepartmentScores(cycle.id),
-    ]);
+      const [orgAgg, deptAggs] = await Promise.all([
+        aggregateCycleScores(cycle.id),
+        aggregateDepartmentScores(cycle.id),
+      ]);
 
-    return res.json({
-      cycleId: cycle.id,
-      title: cycle.title,
-      assessment: cycle.assessment,
-      minimumRespondentsRequired: MIN_DEPT_RESPONDENTS,
-      organisation: {
-        ...cycle.organisation,
-        respondentCount: orgAgg?.respondentCount ?? 0,
-        subscales: orgAgg?.subscales ?? [],
-      },
-      departments: deptAggs,
-      excludedDepartmentsNote:
-        `Departments with fewer than ${MIN_DEPT_RESPONDENTS} respondents are excluded to preserve anonymity.`,
-    });
+      return res.json({
+        cycleId: cycle.id,
+        title: cycle.title,
+        assessment: cycle.assessment,
+        minimumRespondentsRequired: MIN_DEPT_RESPONDENTS,
+        organisation: {
+          ...cycle.organisation,
+          respondentCount: orgAgg?.respondentCount ?? 0,
+          subscales: orgAgg?.subscales ?? [],
+        },
+        departments: deptAggs,
+        excludedDepartmentsNote:
+          `Departments with fewer than ${MIN_DEPT_RESPONDENTS} respondents are excluded to preserve anonymity.`,
+      });
+    } catch (err) { next(err); }
   }
 );
 
@@ -144,19 +147,21 @@ resultsRouter.get(
   "/cycle/:cycleId/response-rate",
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
-  async (req: Request, res: Response) => {
-    const cycle = await resolveCycle(req.params.cycleId, req, res);
-    if (!cycle) return;
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cycle = await resolveCycle(req.params.cycleId, req, res);
+      if (!cycle) return;
 
-    const rate = await getResponseRate(cycle.id);
+      const rate = await getResponseRate(cycle.id);
 
-    return res.json({
-      cycleId: cycle.id,
-      title: cycle.title,
-      status: cycle.status,
-      endsAt: cycle.endsAt,
-      ...rate,
-    });
+      return res.json({
+        cycleId: cycle.id,
+        title: cycle.title,
+        status: cycle.status,
+        endsAt: cycle.endsAt,
+        ...rate,
+      });
+    } catch (err) { next(err); }
   }
 );
 
@@ -168,23 +173,25 @@ resultsRouter.get(
   "/cycle/:cycleId/trend",
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
-  async (req: Request, res: Response) => {
-    const cycle = await resolveCycle(req.params.cycleId, req, res);
-    if (!cycle) return;
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cycle = await resolveCycle(req.params.cycleId, req, res);
+      if (!cycle) return;
 
-    const limit = Math.min(parseInt(req.query.limit as string ?? "12", 10), 24);
-    const trend = await getCycleTrend(
-      cycle.organisationId,
-      cycle.assessment.type,
-      limit
-    );
+      const limit = Math.min(parseInt(req.query.limit as string ?? "12", 10), 24);
+      const trend = await getCycleTrend(
+        cycle.organisationId,
+        cycle.assessment.type,
+        limit
+      );
 
-    return res.json({
-      organisationId: cycle.organisationId,
-      assessmentType: cycle.assessment.type,
-      assessmentName: cycle.assessment.name,
-      dataPoints: trend,
-    });
+      return res.json({
+        organisationId: cycle.organisationId,
+        assessmentType: cycle.assessment.type,
+        assessmentName: cycle.assessment.name,
+        dataPoints: trend,
+      });
+    } catch (err) { next(err); }
   }
 );
 
@@ -197,55 +204,54 @@ resultsRouter.get(
   "/cycle/:cycleId/export",
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
-  async (req: Request, res: Response) => {
-    const cycle = await resolveCycle(req.params.cycleId, req, res);
-    if (!cycle) return;
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cycle = await resolveCycle(req.params.cycleId, req, res);
+      if (!cycle) return;
 
-    // Audit every export
-    await auditLog(AuditAction.DATA_EXPORT, {
-      userId: req.user!.userId,
-      entityType: "AssessmentCycle",
-      entityId: cycle.id,
-      metadata: { exportedBy: req.user!.email ?? req.user!.userId },
-      req,
-    });
+      await auditLog(AuditAction.DATA_EXPORT, {
+        userId: req.user!.userId,
+        entityType: "AssessmentCycle",
+        entityId: cycle.id,
+        metadata: { exportedBy: req.user!.email ?? req.user!.userId },
+        req,
+      });
 
-    // Fetch all submitted respondents with their scores
-    const respondents = await prisma.respondent.findMany({
-      where: { cycleId: cycle.id, submittedAt: { not: null } },
-      select: {
-        id: true,
-        departmentId: true,
-        consentAt: true,
-        consentVersion: true,
-        submittedAt: true,
-        department: { select: { name: true } },
-        scores: {
-          select: { subscale: true, scaledScore: true, band: true },
-          orderBy: { subscale: "asc" },
+      const respondents = await prisma.respondent.findMany({
+        where: { cycleId: cycle.id, submittedAt: { not: null } },
+        select: {
+          id: true,
+          departmentId: true,
+          consentAt: true,
+          consentVersion: true,
+          submittedAt: true,
+          department: { select: { name: true } },
+          scores: {
+            select: { subscale: true, scaledScore: true, band: true },
+            orderBy: { subscale: "asc" },
+          },
         },
-      },
-      orderBy: { submittedAt: "asc" },
-    });
+        orderBy: { submittedAt: "asc" },
+      });
 
-    return res.json({
-      exportedAt: new Date().toISOString(),
-      cycleId: cycle.id,
-      cycleTitle: cycle.title,
-      assessmentType: cycle.assessment.type,
-      assessmentName: cycle.assessment.name,
-      organisationName: cycle.organisation.name,
-      respondentCount: respondents.length,
-      // Pseudonymous — IDs are cuids, no PII
-      respondents: respondents.map((r, i) => ({
-        respondentIndex: i + 1,   // opaque sequence number, no cuid exposed
-        departmentName: r.department?.name ?? null,
-        consentAt: r.consentAt,
-        consentVersion: r.consentVersion,
-        submittedAt: r.submittedAt,
-        scores: r.scores,
-      })),
-    });
+      return res.json({
+        exportedAt: new Date().toISOString(),
+        cycleId: cycle.id,
+        cycleTitle: cycle.title,
+        assessmentType: cycle.assessment.type,
+        assessmentName: cycle.assessment.name,
+        organisationName: cycle.organisation.name,
+        respondentCount: respondents.length,
+        respondents: respondents.map((r, i) => ({
+          respondentIndex: i + 1,
+          departmentName: r.department?.name ?? null,
+          consentAt: r.consentAt,
+          consentVersion: r.consentVersion,
+          submittedAt: r.submittedAt,
+          scores: r.scores,
+        })),
+      });
+    } catch (err) { next(err); }
   }
 );
 
@@ -258,34 +264,35 @@ resultsRouter.post(
   "/cycle/:cycleId/snapshot",
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
-  async (req: Request, res: Response) => {
-    const cycle = await resolveCycle(req.params.cycleId, req, res);
-    if (!cycle) return;
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cycle = await resolveCycle(req.params.cycleId, req, res);
+      if (!cycle) return;
 
-    const summary = await buildCycleSummary(cycle.id);
+      const summary = await buildCycleSummary(cycle.id);
 
-    // Upsert into reports table
-    const existing = await prisma.report.findFirst({
-      where: { cycleId: cycle.id, type: "AD_HOC" },
-    });
+      const existing = await prisma.report.findFirst({
+        where: { cycleId: cycle.id, type: "AD_HOC" },
+      });
 
-    const report = existing
-      ? await prisma.report.update({
-          where: { id: existing.id },
-          data: { summaryData: summary as any, generatedAt: new Date() },
-        })
-      : await prisma.report.create({
-          data: {
-            organisationId: cycle.organisationId,
-            cycleId: cycle.id,
-            type: "AD_HOC",
-            periodStart: cycle.startsAt,
-            periodEnd: cycle.endsAt,
-            summaryData: summary as any,
-            generatedAt: new Date(),
-          },
-        });
+      const report = existing
+        ? await prisma.report.update({
+            where: { id: existing.id },
+            data: { summaryData: summary as any, generatedAt: new Date() },
+          })
+        : await prisma.report.create({
+            data: {
+              organisationId: cycle.organisationId,
+              cycleId: cycle.id,
+              type: "AD_HOC",
+              periodStart: cycle.startsAt,
+              periodEnd: cycle.endsAt,
+              summaryData: summary as any,
+              generatedAt: new Date(),
+            },
+          });
 
-    return res.json({ reportId: report.id, summary });
+      return res.json({ reportId: report.id, summary });
+    } catch (err) { next(err); }
   }
 );

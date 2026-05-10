@@ -564,7 +564,7 @@ function ContactsTab({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">{t("admin_field_password")}</label>
-              <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={INPUT} placeholder="••••••••••" minLength={10} />
+              <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={INPUT} placeholder="••••••••" minLength={8} />
             </div>
             <div className="sm:col-span-2 flex gap-3 pt-1">
               <button type="submit" disabled={adding} className="px-5 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 disabled:opacity-60 transition-colors">

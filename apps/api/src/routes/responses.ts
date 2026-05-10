@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { body, validationResult } from "express-validator";
 import axios from "axios";
 import { prisma } from "../lib/prisma";
@@ -35,133 +35,128 @@ responsesRouter.post(
     body("responses").isObject(),
     body("consentGiven").equals("true").withMessage("Consent is required"),
   ],
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { cycleToken, departmentId, consentVersion, responses } = req.body;
-
-    // 1. Resolve cycle
-    const cycle = await prisma.assessmentCycle.findUnique({
-      where: { linkToken: cycleToken },
-      include: { assessment: true },
-    });
-
-    if (!cycle) return res.status(404).json({ error: "Assessment link not found" });
-    if (cycle.status !== "ACTIVE") return res.status(410).json({ error: "Assessment not active" });
-    if (new Date() > cycle.endsAt) return res.status(410).json({ error: "Assessment expired" });
-
-    // 2. Create respondent with consent record
-    const clientIp =
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ??
-      req.socket.remoteAddress ??
-      "unknown";
-
-    const respondent = await prisma.respondent.create({
-      data: {
-        cycleId: cycle.id,
-        departmentId: departmentId ?? null,
-        consentGiven: true,
-        consentAt: new Date(),
-        consentIp: clientIp,
-        consentVersion: consentVersion ?? "1.0",
-        submittedAt: new Date(),
-      },
-    });
-
-    // 3. Store raw responses
-    const responseRows = Object.entries(responses as Record<string, number>).map(
-      ([questionKey, rawValue]) => ({
-        respondentId: respondent.id,
-        questionKey,
-        rawValue: Number(rawValue),
-      })
-    );
-    await prisma.response.createMany({ data: responseRows });
-
-    // 4. Call scoring service
-    const assessmentType = cycle.assessment.type;
-    const scoringRoute = ASSESSMENT_ROUTE[assessmentType];
-
-    let scoringResult: Record<string, any> = {};
     try {
-      const { data } = await axios.post(
-        `${SCORING_URL}/score/${scoringRoute}`,
-        { responses },
-        { headers: { "X-Scoring-Key": SCORING_KEY }, timeout: 10_000 }
+      const { cycleToken, departmentId, consentVersion, responses } = req.body;
+
+      const cycle = await prisma.assessmentCycle.findUnique({
+        where: { linkToken: cycleToken },
+        include: { assessment: true },
+      });
+
+      if (!cycle) return res.status(404).json({ error: "Assessment link not found" });
+      if (cycle.status !== "ACTIVE") return res.status(410).json({ error: "Assessment not active" });
+      if (new Date() > cycle.endsAt) return res.status(410).json({ error: "Assessment expired" });
+
+      const clientIp =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ??
+        req.socket.remoteAddress ??
+        "unknown";
+
+      const respondent = await prisma.respondent.create({
+        data: {
+          cycleId: cycle.id,
+          departmentId: departmentId ?? null,
+          consentGiven: true,
+          consentAt: new Date(),
+          consentIp: clientIp,
+          consentVersion: consentVersion ?? "1.0",
+          submittedAt: new Date(),
+        },
+      });
+
+      const responseRows = Object.entries(responses as Record<string, number>).map(
+        ([questionKey, rawValue]) => ({
+          respondentId: respondent.id,
+          questionKey,
+          rawValue: Number(rawValue),
+        })
       );
-      scoringResult = data.result;
-    } catch (err) {
-      logger.error("Scoring service error", { err });
-      // Non-fatal: store empty scores, flag for re-processing
-    }
+      await prisma.response.createMany({ data: responseRows });
 
-    // 5. Persist scores
-    const scoreRows = buildScoreRows(respondent.id, scoringResult);
-    if (scoreRows.length > 0) {
-      await prisma.score.createMany({ data: scoreRows });
-    }
+      const assessmentType = cycle.assessment.type;
+      const scoringRoute = ASSESSMENT_ROUTE[assessmentType];
 
-    // 6. Audit log (anonymous — no userId)
-    await auditLog(AuditAction.RESPONSE_SUBMITTED, {
-      entityType: "Respondent",
-      entityId: respondent.id,
-      req,
-    });
-    await auditLog(AuditAction.CONSENT_GIVEN, {
-      entityType: "Respondent",
-      entityId: respondent.id,
-      metadata: { consentVersion, cycleId: cycle.id },
-      req,
-    });
+      let scoringResult: Record<string, any> = {};
+      try {
+        const { data } = await axios.post(
+          `${SCORING_URL}/score/${scoringRoute}`,
+          { responses },
+          { headers: { "X-Scoring-Key": SCORING_KEY }, timeout: 10_000 }
+        );
+        scoringResult = data.result;
+      } catch (err) {
+        logger.error("Scoring service error", { err });
+      }
 
-    // 7. Return scores to employee for immediate feedback
-    return res.status(201).json({
-      sessionToken: respondent.sessionToken,
-      scores: scoringResult,
-    });
+      const scoreRows = buildScoreRows(respondent.id, scoringResult);
+      if (scoreRows.length > 0) {
+        await prisma.score.createMany({ data: scoreRows });
+      }
+
+      await auditLog(AuditAction.RESPONSE_SUBMITTED, {
+        entityType: "Respondent",
+        entityId: respondent.id,
+        req,
+      });
+      await auditLog(AuditAction.CONSENT_GIVEN, {
+        entityType: "Respondent",
+        entityId: respondent.id,
+        metadata: { consentVersion, cycleId: cycle.id },
+        req,
+      });
+
+      return res.status(201).json({
+        sessionToken: respondent.sessionToken,
+        scores: scoringResult,
+      });
+    } catch (err) { next(err); }
   }
 );
 
 // GET /api/responses/my-score/:sessionToken — employee retrieves their own score
-responsesRouter.get("/my-score/:sessionToken", async (req: Request, res: Response) => {
-  const respondent = await prisma.respondent.findUnique({
-    where: { sessionToken: req.params.sessionToken },
-    include: {
-      scores: true,
-      cycle: {
-        include: {
-          assessment: { select: { type: true, name: true } },
-          organisation: { select: { name: true } },
+responsesRouter.get("/my-score/:sessionToken", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const respondent = await prisma.respondent.findUnique({
+      where: { sessionToken: req.params.sessionToken },
+      include: {
+        scores: true,
+        cycle: {
+          include: {
+            assessment: { select: { type: true, name: true } },
+            organisation: { select: { name: true } },
+          },
         },
       },
-    },
-  });
-
-  if (!respondent) return res.status(404).json({ error: "Session not found" });
-
-  // Build department comparison if >= 5 respondents in department
-  let deptAvg: Record<string, any> | null = null;
-  if (respondent.departmentId) {
-    const deptCount = await prisma.respondent.count({
-      where: { cycleId: respondent.cycleId, departmentId: respondent.departmentId, submittedAt: { not: null } },
     });
-    if (deptCount >= 5) {
-      deptAvg = await computeGroupAverage(respondent.cycleId, respondent.departmentId);
+
+    if (!respondent) return res.status(404).json({ error: "Session not found" });
+
+    let deptAvg: Record<string, any> | null = null;
+    if (respondent.departmentId) {
+      const deptCount = await prisma.respondent.count({
+        where: { cycleId: respondent.cycleId, departmentId: respondent.departmentId, submittedAt: { not: null } },
+      });
+      if (deptCount >= 5) {
+        deptAvg = await computeGroupAverage(respondent.cycleId, respondent.departmentId);
+      }
     }
-  }
 
-  const orgAvg = await computeGroupAverage(respondent.cycleId, null);
+    const orgAvg = await computeGroupAverage(respondent.cycleId, null);
 
-  return res.json({
-    assessment: respondent.cycle.assessment,
-    submittedAt: respondent.submittedAt,
-    myScores: respondent.scores,
-    orgAverage: orgAvg,
-    departmentAverage: deptAvg,
-  });
+    return res.json({
+      assessment: respondent.cycle.assessment,
+      submittedAt: respondent.submittedAt,
+      myScores: respondent.scores,
+      orgAverage: orgAvg,
+      departmentAverage: deptAvg,
+    });
+  } catch (err) { next(err); }
 });
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

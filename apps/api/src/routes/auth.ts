@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { StringValue } from "ms";
@@ -27,53 +27,54 @@ function issueTokens(userId: string, email: string, role: string, organisationId
 }
 
 // POST /api/auth/login
-authRouter.post("/login", loginValidation, async (req: Request, res: Response) => {
+authRouter.post("/login", loginValidation, async (req: Request, res: Response, next: NextFunction) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !user.isActive || user.deletedAt) {
-    await auditLog(AuditAction.LOGIN_FAILED, { metadata: { email }, req });
-    return res.status(401).json({ error: "Invalid credentials" });
-  }
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || !user.isActive || user.deletedAt) {
+      await auditLog(AuditAction.LOGIN_FAILED, { metadata: { email }, req });
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
 
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) {
-    await auditLog(AuditAction.LOGIN_FAILED, { userId: user.id, req });
-    return res.status(401).json({ error: "Invalid credentials" });
-  }
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      await auditLog(AuditAction.LOGIN_FAILED, { userId: user.id, req });
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
 
-  const { accessToken, refreshToken } = issueTokens(
-    user.id,
-    user.email,
-    user.role,
-    user.organisationId
-  );
+    const { accessToken, refreshToken } = issueTokens(
+      user.id,
+      user.email,
+      user.role,
+      user.organisationId
+    );
 
-  // Store refresh token
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 30);
-  await prisma.refreshToken.create({ data: { userId: user.id, token: refreshToken, expiresAt } });
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+    await prisma.refreshToken.create({ data: { userId: user.id, token: refreshToken, expiresAt } });
 
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-  await auditLog(AuditAction.LOGIN_SUCCESS, { userId: user.id, req });
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    await auditLog(AuditAction.LOGIN_SUCCESS, { userId: user.id, req });
 
-  return res.json({
-    accessToken,
-    refreshToken,
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      organisationId: user.organisationId,
-    },
-  });
+    return res.json({
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        organisationId: user.organisationId,
+      },
+    });
+  } catch (err) { next(err); }
 });
 
 // POST /api/auth/refresh
@@ -109,32 +110,36 @@ authRouter.post("/refresh", async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/logout
-authRouter.post("/logout", requireAuth, async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
-  if (refreshToken) {
-    await prisma.refreshToken.updateMany({
-      where: { token: refreshToken },
-      data: { revokedAt: new Date() },
-    });
-  }
-  await auditLog(AuditAction.LOGOUT, { userId: req.user?.userId, req });
-  return res.json({ message: "Logged out" });
+authRouter.post("/logout", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refreshToken } = req.body;
+    if (refreshToken) {
+      await prisma.refreshToken.updateMany({
+        where: { token: refreshToken },
+        data: { revokedAt: new Date() },
+      });
+    }
+    await auditLog(AuditAction.LOGOUT, { userId: req.user?.userId, req });
+    return res.json({ message: "Logged out" });
+  } catch (err) { next(err); }
 });
 
 // GET /api/auth/me
-authRouter.get("/me", requireAuth, async (req: Request, res: Response) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.user!.userId },
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      role: true,
-      organisationId: true,
-      lastLoginAt: true,
-    },
-  });
-  if (!user) return res.status(404).json({ error: "User not found" });
-  return res.json(user);
+authRouter.get("/me", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        organisationId: true,
+        lastLoginAt: true,
+      },
+    });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    return res.json(user);
+  } catch (err) { next(err); }
 });
