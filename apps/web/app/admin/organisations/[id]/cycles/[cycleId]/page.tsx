@@ -59,6 +59,10 @@ export default function CycleDetailPage() {
   const [msg,     setMsg]     = useState<{ text: string; ok: boolean } | null>(null);
   const [copied,  setCopied]  = useState(false);
 
+  // Recipients editor state
+  const [emailInput,   setEmailInput]   = useState("");
+  const [emailSaving,  setEmailSaving]  = useState(false);
+
   const authHeader = useCallback(() => ({
     Authorization:  `Bearer ${localStorage.getItem("mindlign_token") ?? ""}`,
     "Content-Type": "application/json",
@@ -100,6 +104,55 @@ export default function CycleDetailPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  async function addEmail() {
+    if (!cycle || !emailInput.trim()) return;
+    const newEmail = emailInput.trim().toLowerCase();
+    const current  = cycle.recipientEmails ?? [];
+    if (current.includes(newEmail)) {
+      setMsg({ text: lang === "ar" ? "البريد موجود بالفعل." : "Email already in the list.", ok: false });
+      return;
+    }
+    const updated = [...current, newEmail];
+    setEmailSaving(true);
+    try {
+      const res  = await fetch(`${API_BASE}/assessments/cycles/${cycleId}/recipients`, {
+        method:  "PATCH",
+        headers: authHeader(),
+        body:    JSON.stringify({ emails: updated }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to save");
+      setEmailInput("");
+      setMsg({ text: lang === "ar" ? "تمت إضافة البريد الإلكتروني." : "Email added.", ok: true });
+      loadCycle();
+    } catch (err: any) {
+      setMsg({ text: err.message, ok: false });
+    } finally {
+      setEmailSaving(false);
+    }
+  }
+
+  async function removeEmail(email: string) {
+    if (!cycle) return;
+    const updated = (cycle.recipientEmails ?? []).filter((e) => e !== email);
+    setEmailSaving(true);
+    try {
+      const res  = await fetch(`${API_BASE}/assessments/cycles/${cycleId}/recipients`, {
+        method:  "PATCH",
+        headers: authHeader(),
+        body:    JSON.stringify({ emails: updated }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to save");
+      setMsg({ text: lang === "ar" ? "تمت إزالة البريد الإلكتروني." : "Email removed.", ok: true });
+      loadCycle();
+    } catch (err: any) {
+      setMsg({ text: err.message, ok: false });
+    } finally {
+      setEmailSaving(false);
+    }
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -230,6 +283,60 @@ export default function CycleDetailPage() {
           {lang === "ar"
             ? "شارك هذا الرابط مع الموظفين للوصول إلى التقييم."
             : "Share this link with employees to access the assessment."}
+        </p>
+      </div>
+
+      {/* Recipient emails */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+        <h2 className="font-semibold text-gray-800">
+          {lang === "ar" ? "قائمة المستلمين" : "Recipient Emails"}
+        </h2>
+
+        {/* Add email row */}
+        <div className="flex gap-2">
+          <input
+            type="email"
+            value={emailInput}
+            onChange={(e) => setEmailInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEmail(); } }}
+            placeholder="name@company.com"
+            className="flex-1 px-3 py-2 rounded-xl border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-brand-400 focus:border-brand-400 outline-none transition-all"
+          />
+          <button
+            onClick={addEmail}
+            disabled={emailSaving || !emailInput.trim()}
+            className="shrink-0 px-4 py-2 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 disabled:opacity-50 transition-colors"
+          >
+            {lang === "ar" ? "إضافة" : "Add"}
+          </button>
+        </div>
+
+        {/* Email list */}
+        {(cycle.recipientEmails?.length ?? 0) === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-3">
+            {lang === "ar" ? "لا توجد عناوين بريد مضافة بعد." : "No emails added yet."}
+          </p>
+        ) : (
+          <ul className="divide-y divide-gray-50">
+            {(cycle.recipientEmails ?? []).map((email) => (
+              <li key={email} className="flex items-center justify-between py-2 gap-3">
+                <span className="text-sm text-gray-700 font-mono truncate">{email}</span>
+                <button
+                  onClick={() => removeEmail(email)}
+                  disabled={emailSaving}
+                  className="shrink-0 text-xs text-red-500 hover:text-red-700 disabled:opacity-40 transition-colors"
+                >
+                  {lang === "ar" ? "حذف" : "Remove"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <p className="text-xs text-gray-400">
+          {lang === "ar"
+            ? "يتم إرسال دعوات التذكير والنتائج إلى هذه العناوين."
+            : "Invites, reminders, and results notifications are sent to these addresses."}
         </p>
       </div>
 

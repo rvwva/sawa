@@ -396,7 +396,32 @@ assessmentsRouter.get(
   }
 );
 
-// ─── GET /api/assessments/cycles/:id — admin cycle detail ────────────────────
+// ─── PATCH /api/assessments/cycles/:id/recipients — update recipient list ────
+
+assessmentsRouter.patch(
+  "/cycles/:id/recipients",
+  requireAuth,
+  requireRole("ADMIN", "EXECUTIVE"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cycle = await prisma.assessmentCycle.findUnique({ where: { id: req.params.id } });
+      if (!cycle) return res.status(404).json({ error: "Cycle not found" });
+      if (req.user!.role === "EXECUTIVE" && cycle.organisationId !== req.user!.organisationId)
+        return res.status(403).json({ error: "Access denied" });
+
+      const { emails } = req.body as { emails: string[] };
+      if (!Array.isArray(emails)) return res.status(400).json({ error: "emails must be an array" });
+
+      const cleaned = [...new Set(emails.map((e: string) => e.trim().toLowerCase()).filter(Boolean))];
+      const updated = await prisma.assessmentCycle.update({
+        where: { id: req.params.id },
+        data:  { recipientEmails: cleaned },
+      });
+
+      return res.json({ recipientEmails: updated.recipientEmails });
+    } catch (err) { next(err); }
+  }
+);
 // Must be registered AFTER /cycles/by-token/:token to avoid shadowing.
 
 assessmentsRouter.get(
