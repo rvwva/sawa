@@ -113,7 +113,7 @@ export default function AssessmentPage() {
   const [stage, setStage] = useState<Stage>("loading");
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [selectedDeptId, setSelectedDeptId] = useState<string | undefined>();
-  const [result, setResult] = useState<SubmissionResult | null>(null);
+
   const [errorMsg, setErrorMsg] = useState("");
 
   const t = useTranslations(lang);
@@ -148,8 +148,7 @@ export default function AssessmentPage() {
     setStage("form");
   }
 
-  function handleFormComplete(res: SubmissionResult) {
-    setResult(res);
+  function handleFormComplete(_res: SubmissionResult) {
     setStage("results");
   }
 
@@ -239,15 +238,9 @@ export default function AssessmentPage() {
         )}
 
         {/* Results */}
-        {stage === "results" && result && cycleInfo && (
+        {stage === "results" && cycleInfo && (
           <ResultsScreen
             lang={lang}
-            scores={result.scores}
-            sessionToken={result.sessionToken}
-            assessmentType={cycleInfo.assessment.type}
-            assessmentName={
-              lang === "ar" ? cycleInfo.assessment.nameAr : cycleInfo.assessment.name
-            }
             organisationName={orgName ?? ""}
           />
         )}
