@@ -5,7 +5,7 @@ import { requireAuth } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import { AuditAction } from "@prisma/client";
-import { aggregateCycleScores, buildCycleSummary } from "../services/scoring";
+import { aggregateCycleScores, aggregateDepartmentScores, buildCycleSummary } from "../services/scoring";
 import {
   sendCycleClosedNotification,
   sendCycleInvite,
@@ -339,6 +339,7 @@ assessmentsRouter.patch(
     // Send team pulse to stored recipient list (non-blocking)
     const emails = (cycle.recipientEmails as string[] | null) ?? [];
     if (emails.length > 0) {
+      const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
       sendTeamPulseNotification({
         recipientEmails:    emails,
         organisationName:   cycle.organisation.name,
@@ -346,6 +347,7 @@ assessmentsRouter.patch(
         cycleTitle:         cycle.title,
         assessmentName:     cycle.assessment.name,
         assessmentNameAr:   cycle.assessment.nameAr ?? undefined,
+        resultsUrl:         `${appUrl}/results/${cycle.linkToken}`,
       }).catch((err) => logger.error("sendTeamPulseNotification failed", { err }));
     }
 
@@ -393,6 +395,49 @@ assessmentsRouter.get(
       organisation: org,
       departments,
     });
+  }
+);
+
+// ─── GET /api/assessments/cycles/results/:token — public team results ─────────
+// Returned only when the cycle's resultsPublishedAt is set. No auth required.
+// Returns aggregated (non-individual) org + department scores.
+
+assessmentsRouter.get(
+  "/cycles/results/:token",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cycle = await prisma.assessmentCycle.findUnique({
+        where: { linkToken: req.params.token },
+        include: {
+          assessment: { select: { type: true, name: true, nameAr: true } },
+          organisation: { select: { name: true, nameAr: true, logoUrl: true } },
+        },
+      });
+
+      if (!cycle) return res.status(404).json({ error: "Results not found" });
+      if (!cycle.resultsPublishedAt)
+        return res.status(403).json({ error: "Results have not been published yet" });
+
+      const [orgAgg, deptAggs] = await Promise.all([
+        aggregateCycleScores(cycle.id),
+        aggregateDepartmentScores(cycle.id),
+      ]);
+
+      return res.json({
+        cycleId:           cycle.id,
+        cycleTitle:        cycle.title,
+        assessmentType:    cycle.assessment.type,
+        assessmentName:    cycle.assessment.name,
+        assessmentNameAr:  cycle.assessment.nameAr,
+        organisationName:  cycle.organisation.name,
+        organisationNameAr: cycle.organisation.nameAr,
+        logoUrl:           cycle.organisation.logoUrl,
+        respondentCount:   orgAgg?.respondentCount ?? 0,
+        publishedAt:       cycle.resultsPublishedAt,
+        organisation:      orgAgg,
+        departments:       deptAggs,
+      });
+    } catch (err) { next(err); }
   }
 );
 

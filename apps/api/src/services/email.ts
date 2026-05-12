@@ -58,6 +58,7 @@ export interface TeamPulseParams {
   cycleTitle:       string;
   assessmentName:   string;
   assessmentNameAr?: string;
+  resultsUrl:       string;
 }
 
 export interface WeeklyReportParams {
@@ -476,10 +477,14 @@ export async function sendTeamPulseNotification(params: TeamPulseParams): Promis
         <strong>Thank you for participating.</strong> Your voice makes a real difference —
         even though your responses remain completely anonymous.
       </p>
+      <div class="cta-row">
+        <a class="cta" href="${params.resultsUrl}">View Team Results &rarr;</a>
+      </div>
+      <p class="link">
+        Or paste this link into your browser:<br>${params.resultsUrl}
+      </p>
       <p class="mute">
-        Individual results are never shared. All data is aggregated and shown
-        only as group statistics. If you have questions about your data, use
-        your session token to access or delete your record at any time.
+        All scores are group averages. No individual responses are ever shown.
       </p>
     </div>
 
@@ -498,10 +503,11 @@ export async function sendTeamPulseNotification(params: TeamPulseParams): Promis
         <strong>شكراً لمشاركتك.</strong> صوتك يُحدث فارقاً حقيقياً —
         حتى وإن ظلت ردودك مجهولة الهوية تماماً.
       </p>
+      <div class="cta-row">
+        <a class="cta" href="${params.resultsUrl}">عرض نتائج الفريق &larr;</a>
+      </div>
       <p class="mute" style="direction:rtl;text-align:right">
-        لا تُشارَك النتائج الفردية مطلقاً. جميع البيانات مجمّعة وتُعرض
-        كإحصاءات جماعية فقط. إذا كانت لديك أسئلة حول بياناتك، استخدم
-        رمز جلستك للوصول إلى سجلاتك أو حذفها في أي وقت.
+        جميع الدرجات المعروضة هي متوسطات جماعية. لا تُعرض أي ردود فردية.
       </p>
     </div>`;
 
