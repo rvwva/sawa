@@ -60,7 +60,7 @@ async function main() {
     {
       type: AssessmentType.CULTURE,
       name: "Mindlign Culture Assessment",
-      nameAr: "تقييم ثقافة ماينداين",
+      nameAr: "تقييم ثقافة مايندلاين",
       description:
         "Proprietary 9-dimension workplace culture assessment across 40 items.",
       itemCount: 40,
