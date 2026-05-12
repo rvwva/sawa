@@ -15,7 +15,7 @@ import { logger } from "../lib/logger";
 sgMail.setApiKey(process.env.SENDGRID_API_KEY ?? "");
 
 const FROM = {
-  email: process.env.EMAIL_FROM      ?? "noreply@sawa.app",
+  email: process.env.EMAIL_FROM      ?? "rawan@mindlign.com",
   name:  process.env.EMAIL_FROM_NAME ?? "Mindlign",
 };
 
@@ -247,8 +247,13 @@ export async function sendCycleInvite(params: CycleInviteParams): Promise<void> 
   try {
     await sgMail.send(messages as any);
     logger.info(`Invite sent to ${messages.length} recipients`, { cycleTitle: params.cycleTitle });
-  } catch (err) {
-    logger.error("sendCycleInvite failed", { err });
+  } catch (err: any) {
+    logger.error("sendCycleInvite failed", {
+      message: err?.message,
+      code:    err?.code,
+      status:  err?.response?.status,
+      body:    err?.response?.body,
+    });
     throw err;
   }
 }
@@ -330,8 +335,13 @@ export async function sendCycleReminder(params: CycleReminderParams): Promise<vo
   try {
     await sgMail.send(messages as any);
     logger.info(`Reminder (${params.daysRemaining}d) sent to ${messages.length} recipients`);
-  } catch (err) {
-    logger.error("sendCycleReminder failed", { err });
+  } catch (err: any) {
+    logger.error("sendCycleReminder failed", {
+      message: err?.message,
+      code:    err?.code,
+      status:  err?.response?.status,
+      body:    err?.response?.body,
+    });
     throw err;
   }
 }
@@ -429,8 +439,13 @@ export async function sendCycleClosedNotification(params: CycleClosedParams): Pr
       html:    html("Assessment Results Ready · النتائج جاهزة", body),
     });
     logger.info("Cycle-closed notification sent", { to: params.recipientEmail });
-  } catch (err) {
-    logger.error("sendCycleClosedNotification failed", { err });
+  } catch (err: any) {
+    logger.error("sendCycleClosedNotification failed", {
+      message: err?.message,
+      code:    err?.code,
+      status:  err?.response?.status,
+      body:    err?.response?.body,
+    });
     throw err;
   }
 }
@@ -502,8 +517,13 @@ export async function sendTeamPulseNotification(params: TeamPulseParams): Promis
   try {
     await sgMail.send(messages as any);
     logger.info(`Team pulse sent to ${messages.length} recipients`, { cycleTitle: params.cycleTitle });
-  } catch (err) {
-    logger.error("sendTeamPulseNotification failed", { err });
+  } catch (err: any) {
+    logger.error("sendTeamPulseNotification failed", {
+      message: err?.message,
+      code:    err?.code,
+      status:  err?.response?.status,
+      body:    err?.response?.body,
+    });
     throw err;
   }
 }
@@ -558,8 +578,13 @@ export async function sendReportEmail(params: WeeklyReportParams): Promise<void>
       html:    html("People Intelligence Report · تقرير الذكاء البشري", body),
     });
     logger.info("Report email sent", { to: params.recipientEmail });
-  } catch (err) {
-    logger.error("sendReportEmail failed", { err });
+  } catch (err: any) {
+    logger.error("sendReportEmail failed", {
+      message: err?.message,
+      code:    err?.code,
+      status:  err?.response?.status,
+      body:    err?.response?.body,
+    });
     throw err;
   }
 }
