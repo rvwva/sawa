@@ -145,7 +145,7 @@ assessmentsRouter.patch(
 
     // Send invitations (non-blocking)
     if (recipientEmails && recipientEmails.length > 0) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
       sendCycleInvite({
         recipientEmails,
         organisationName:   cycle.organisation.name,
@@ -194,7 +194,7 @@ assessmentsRouter.patch(
       const daysRemaining = Math.ceil(
         (cycle.endsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       );
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
       // Record send time immediately, then fire email non-blocking (same
       // pattern as activate/publish — don't block the response on SendGrid).
@@ -287,7 +287,7 @@ assessmentsRouter.patch(
       where: { id: req.user!.userId },
       select: { email: true, firstName: true },
     });
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
     if (closingUser?.email) {
       sendCycleClosedNotification({
