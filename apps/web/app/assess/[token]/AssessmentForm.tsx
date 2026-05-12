@@ -7,6 +7,29 @@ import { useTranslations } from "@/lib/i18n";
 import { makeBilingualSchema } from "@/lib/survey-translations";
 import type { CycleInfo, SubmissionResult } from "./page";
 
+const DEFINITIONS: Record<string, { en: string; ar: string; source: string }> = {
+  CBI: {
+    en:     "Burnout is a state of prolonged physical and mental exhaustion related to work or personal demands. It is not a disease, but a natural response to sustained stress.",
+    ar:     "الاحتراق الوظيفي هو حالة من الإرهاق الجسدي والنفسي المطوّل الناتج عن ضغوط العمل أو المتطلبات الشخصية. وهو ليس مرضاً، بل استجابة طبيعية للضغط المستمر.",
+    source: "Kristensen TS, et al. (2005). The Copenhagen Burnout Inventory. Work & Stress, 19(3), 192–207.",
+  },
+  PSS: {
+    en:     "Perceived stress refers to how unpredictable, uncontrollable, and overwhelming you find your life. This scale measures your subjective experience of stress over the past month.",
+    ar:     "يشير الضغط المُدرَك إلى مدى شعورك بأن حياتك غير قابلة للتنبؤ أو السيطرة أو أنها مُرهِقة. يقيس هذا المقياس تجربتك الشخصية للضغط خلال الشهر الماضي.",
+    source: "Cohen S, Kamarck T, Mermelstein R. (1983). A global measure of perceived stress. Journal of Health and Social Behavior, 24(4), 385–396.",
+  },
+  WHO5: {
+    en:     "Wellbeing refers to feeling positive, active, and rested in your daily life. This index measures your general mental wellbeing over the past two weeks.",
+    ar:     "تشير الرفاهية النفسية إلى الشعور بالإيجابية والنشاط والراحة في حياتك اليومية. يقيس هذا المؤشر رفاهيتك النفسية العامة خلال الأسبوعين الماضيين.",
+    source: "World Health Organization (1998). WHO-5 Wellbeing Index. WHO Regional Office for Europe, Copenhagen.",
+  },
+  CULTURE: {
+    en:     "Organizational culture refers to the shared values, behaviors, and practices that shape how work gets done. This assessment measures how your workplace culture is experienced across nine key dimensions.",
+    ar:     "تشير ثقافة المنظمة إلى القيم والسلوكيات والممارسات المشتركة التي تحدد كيفية إنجاز العمل. يقيس هذا التقييم تجربتك لثقافة بيئة عملك عبر تسعة أبعاد رئيسية.",
+    source: "Mindlign Culture Assessment (2026). Mindlign Platform.",
+  },
+};
+
 // SurveyJS must be loaded client-side only (it accesses window/document)
 const SurveyComponent = dynamic(() => import("./SurveyWrapper"), { ssr: false });
 
@@ -135,8 +158,18 @@ export default function AssessmentForm({
 
       {/* SurveyJS form */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="border-b border-gray-100 px-5 py-4">
+        <div className="border-b border-gray-100 px-5 py-4 space-y-3">
           <h2 className="font-bold text-gray-900">{assessmentName}</h2>
+          {DEFINITIONS[cycleInfo.assessment.type] && (() => {
+            const def = DEFINITIONS[cycleInfo.assessment.type];
+            return (
+              <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 space-y-2">
+                <p className="text-sm text-gray-700 leading-relaxed">{def.en}</p>
+                <p className="text-sm text-gray-600 leading-relaxed text-right" dir="rtl">{def.ar}</p>
+                <p className="text-xs text-gray-400 italic">{def.source}</p>
+              </div>
+            );
+          })()}
         </div>
         <SurveyComponent
           schema={schema}
