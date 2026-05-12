@@ -78,6 +78,7 @@ model Organisation {
   users       User[]
   cycles      AssessmentCycle[]
   reports     Report[]
+  employees   Employee[]
 
   @@map("organisations")
 }
@@ -282,6 +283,21 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ─── Employee List (CSV upload — used to pre-populate cycle recipient emails) ─
+
+model Employee {
+  id             String   @id @default(cuid())
+  organisationId String   @map("organisation_id")
+  email          String
+  department     String?  // department name from CSV (free text)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@unique([organisationId, email])
+  @@map("employees")
 }
 
 // ─── Data Deletion Requests (GDPR/PDPL compliance) ──────────────────────────

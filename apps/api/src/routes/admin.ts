@@ -182,6 +182,93 @@ adminRouter.get(
   }
 );
 
+// ─── POST /api/admin/organisations/:orgId/employees/upload ───────────────────
+// Accepts a JSON array of { email, department } rows parsed from a CSV on the
+// client. Upserts all rows (replace list on re-upload via delete + insert).
+// Requires ADMIN role; EXECUTIVE may upload only for their own org.
+
+adminRouter.post(
+  "/organisations/:orgId/employees/upload",
+  requireAuth,
+  requireRole("ADMIN", "EXECUTIVE"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { orgId } = req.params;
+
+      if (req.user!.role === "EXECUTIVE" && req.user!.organisationId !== orgId)
+        return res.status(403).json({ error: "Access denied" });
+
+      const rows = req.body as { email: string; department?: string }[];
+      if (!Array.isArray(rows) || rows.length === 0)
+        return res.status(400).json({ error: "No employee rows provided" });
+
+      const cleaned = rows
+        .map((r) => ({ email: r.email?.trim().toLowerCase(), department: r.department?.trim() || null }))
+        .filter((r) => r.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email));
+
+      if (cleaned.length === 0)
+        return res.status(400).json({ error: "No valid email addresses found" });
+
+      // Replace the existing list for this org atomically
+      await prisma.$transaction([
+        prisma.employee.deleteMany({ where: { organisationId: orgId } }),
+        prisma.employee.createMany({ data: cleaned.map((r) => ({ ...r, organisationId: orgId })) }),
+      ]);
+
+      // Return summary: total + counts per department (never individual emails)
+      const summary = await prisma.employee.groupBy({
+        by: ["department"],
+        where: { organisationId: orgId },
+        _count: { id: true },
+        orderBy: { department: "asc" },
+      });
+
+      return res.json({
+        total: cleaned.length,
+        byDepartment: summary.map((s) => ({
+          department: s.department ?? "(no department)",
+          count: s._count.id,
+        })),
+      });
+    } catch (err) { next(err); }
+  }
+);
+
+// ─── GET /api/admin/organisations/:orgId/employees/summary ───────────────────
+// Returns aggregate counts only — never individual emails.
+
+adminRouter.get(
+  "/organisations/:orgId/employees/summary",
+  requireAuth,
+  requireRole("ADMIN", "EXECUTIVE"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { orgId } = req.params;
+
+      if (req.user!.role === "EXECUTIVE" && req.user!.organisationId !== orgId)
+        return res.status(403).json({ error: "Access denied" });
+
+      const [total, byDept] = await Promise.all([
+        prisma.employee.count({ where: { organisationId: orgId } }),
+        prisma.employee.groupBy({
+          by: ["department"],
+          where: { organisationId: orgId },
+          _count: { id: true },
+          orderBy: { department: "asc" },
+        }),
+      ]);
+
+      return res.json({
+        total,
+        byDepartment: byDept.map((s) => ({
+          department: s.department ?? "(no department)",
+          count: s._count.id,
+        })),
+      });
+    } catch (err) { next(err); }
+  }
+);
+
 // ─── POST /api/admin/data-retention ──────────────────────────────────────────
 
 adminRouter.post(

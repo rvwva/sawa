@@ -1,6 +1,6 @@
 "use client";
 import { API_BASE } from "@/lib/api";
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAdminLang } from "../../context";
@@ -633,6 +633,150 @@ function ContactsTab({
 // SETTINGS TAB
 // ─────────────────────────────────────────────────────────────────────────────
 
+function EmployeeListSection({
+  orgId, lang, authHeader,
+}: { orgId: string; lang: string; authHeader: () => Record<string, string> }) {
+  const [summary,    setSummary]    = useState<{ total: number; byDepartment: { department: string; count: number }[] } | null>(null);
+  const [uploading,  setUploading]  = useState(false);
+  const [uploadMsg,  setUploadMsg]  = useState<{ text: string; ok: boolean } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/admin/organisations/${orgId}/employees/summary`, { headers: authHeader() })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setSummary(d); })
+      .catch(() => {});
+  }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function parseCSV(text: string): { email: string; department: string }[] {
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const rows: { email: string; department: string }[] = [];
+    for (const line of lines) {
+      // Skip header row if it looks like one
+      if (/^email/i.test(line)) continue;
+      const [rawEmail, rawDept] = line.split(",").map((c) => c.trim().replace(/^["']|["']$/g, ""));
+      if (rawEmail) rows.push({ email: rawEmail.toLowerCase(), department: rawDept ?? "" });
+    }
+    return rows;
+  }
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadMsg(null);
+    setUploading(true);
+    try {
+      const text = await file.text();
+      const rows = parseCSV(text);
+      if (rows.length === 0) throw new Error(lang === "ar" ? "لم يتم العثور على سجلات صالحة في الملف." : "No valid records found in the file.");
+
+      const res  = await fetch(`${API_BASE}/admin/organisations/${orgId}/employees/upload`, {
+        method:  "POST",
+        headers: { ...authHeader(), "Content-Type": "application/json" },
+        body:    JSON.stringify(rows),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Upload failed");
+
+      setSummary(data);
+      setUploadMsg({
+        text: lang === "ar"
+          ? `تم رفع ${data.total} موظف بنجاح.`
+          : `${data.total} employees uploaded successfully.`,
+        ok: true,
+      });
+    } catch (err: any) {
+      setUploadMsg({ text: err.message, ok: false });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 mt-6">
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <h2 className="font-semibold text-gray-800">
+            {lang === "ar" ? "قائمة الموظفين" : "Employee List"}
+          </h2>
+          <p className="text-xs text-gray-400 mt-1">
+            {lang === "ar"
+              ? "رفع ملف CSV بعمودين: email و department. تستخدم القائمة تلقائياً عند إنشاء الدورات."
+              : "Upload a CSV with two columns: email and department. Used automatically when cycles are created."}
+          </p>
+        </div>
+        <label className={[
+          "shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-colors",
+          uploading ? "bg-gray-100 text-gray-400" : "bg-brand-500 text-white hover:bg-brand-600",
+        ].join(" ")}>
+          {uploading
+            ? (lang === "ar" ? "جارٍ الرفع…" : "Uploading…")
+            : (lang === "ar" ? "رفع CSV" : "Upload CSV")}
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            disabled={uploading}
+            onChange={handleFile}
+          />
+        </label>
+      </div>
+
+      {uploadMsg && (
+        <div className={[
+          "mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm",
+          uploadMsg.ok ? "bg-green-50 border border-green-200 text-green-700"
+                       : "bg-red-50 border border-red-200 text-red-700",
+        ].join(" ")}>
+          <span>{uploadMsg.ok ? "✓" : "✕"}</span>
+          <span className="flex-1">{uploadMsg.text}</span>
+          <button onClick={() => setUploadMsg(null)} className="opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
+      {summary && summary.total > 0 ? (
+        <div className="space-y-2">
+          <p className="text-sm text-gray-600 font-medium">
+            {lang === "ar" ? `إجمالي: ${summary.total} موظف` : `Total: ${summary.total} employees`}
+          </p>
+          <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
+            {summary.byDepartment.map(({ department, count }) => (
+              <div key={department} className="flex items-center justify-between px-4 py-2.5 bg-gray-50/50">
+                <span className="text-sm text-gray-700">{department}</span>
+                <span className="text-sm font-semibold text-gray-500">
+                  {count} {lang === "ar" ? "موظف" : count === 1 ? "employee" : "employees"}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 pt-1">
+            {lang === "ar"
+              ? "تُعرض الأعداد فقط — لا تُعرض عناوين البريد الإلكتروني الفردية."
+              : "Only counts are shown — individual email addresses are never displayed."}
+          </p>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400 text-center py-4">
+          {lang === "ar" ? "لم يتم رفع أي قائمة موظفين بعد." : "No employee list uploaded yet."}
+        </p>
+      )}
+
+      <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+        <p className="text-xs text-blue-700 font-medium mb-1">
+          {lang === "ar" ? "تنسيق CSV المتوقع:" : "Expected CSV format:"}
+        </p>
+        <code className="text-xs text-blue-600 font-mono block">
+          email,department<br />
+          ahmed@company.com,Engineering<br />
+          sara@company.com,HR
+        </code>
+      </div>
+    </div>
+  );
+}
+
 function SettingsTab({
   org, lang, t, reload, authHeader,
 }: { org: OrgDetail; lang: string; t: (k: any) => string; reload: () => void; authHeader: () => Record<string, string> }) {
@@ -735,6 +879,8 @@ function SettingsTab({
           </div>
         </form>
       </div>
+
+      <EmployeeListSection orgId={org.id} lang={lang} authHeader={authHeader} />
     </div>
   );
 }

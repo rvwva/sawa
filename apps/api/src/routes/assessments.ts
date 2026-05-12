@@ -126,7 +126,19 @@ assessmentsRouter.patch(
     if (cycle.status !== "DRAFT")
       return res.status(409).json({ error: `Cycle is already ${cycle.status}` });
 
-    const { recipientEmails } = req.body as { recipientEmails?: string[] };
+    let { recipientEmails } = req.body as { recipientEmails?: string[] };
+
+    // If no emails supplied, fall back to the org's uploaded employee list
+    if (!recipientEmails || recipientEmails.length === 0) {
+      const employees = await prisma.employee.findMany({
+        where:  { organisationId: cycle.organisationId },
+        select: { email: true },
+      });
+      if (employees.length > 0) {
+        recipientEmails = employees.map((e) => e.email);
+        logger.info(`Auto-populated ${recipientEmails.length} recipients from employee list`, { cycleId: cycle.id });
+      }
+    }
 
     // Persist recipient list on the cycle for automated reminders later
     const updated = await prisma.assessmentCycle.update({
