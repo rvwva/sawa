@@ -1,5 +1,5 @@
 /**
- * Sawa Proprietary Culture Assessment — SurveyJS Schema + Scoring Rules
+ * Mindlign Proprietary Culture Assessment — SurveyJS Schema + Scoring Rules
  * ========================================================================
  * 9 dimensions · 40 items · 5-point Likert scale.
  *
@@ -31,7 +31,7 @@ function item(name: string, title: string) {
 }
 
 export const CULTURE_SURVEY_SCHEMA = {
-  title: "Sawa Culture Assessment",
+  title: "Mindlign Culture Assessment",
   description:
     "This assessment measures nine dimensions of your workplace culture. Please rate each statement based on your actual experience at work — not how you think things should be.",
   logoPosition: "right",
