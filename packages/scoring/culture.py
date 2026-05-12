@@ -1,5 +1,5 @@
 """
-Sawa Proprietary Culture Assessment — Scoring Module
+Mindlign Proprietary Culture Assessment — Scoring Module
 =====================================================
 9 dimensions, 40 items total. 5-point Likert scale.
 
@@ -149,7 +149,7 @@ def validate_responses(responses: Dict[str, int]) -> List[str]:
 
 def score(responses: Dict[str, int]) -> CultureResult:
     """
-    Compute Sawa Culture Assessment dimension and overall scores.
+    Compute Mindlign Culture Assessment dimension and overall scores.
 
     Parameters
     ----------

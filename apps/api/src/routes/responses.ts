@@ -94,7 +94,7 @@ responsesRouter.post(
         logger.error("Scoring service error", { err });
       }
 
-      const scoreRows = buildScoreRows(respondent.id, scoringResult);
+      const scoreRows = buildScoreRows(respondent.id, scoringResult, assessmentType);
       if (scoreRows.length > 0) {
         await prisma.score.createMany({ data: scoreRows });
       }
@@ -163,7 +163,8 @@ responsesRouter.get("/my-score/:sessionToken", async (req: Request, res: Respons
 
 function buildScoreRows(
   respondentId: string,
-  result: Record<string, any>
+  result: Record<string, any>,
+  assessmentType: string,
 ): {
   respondentId: string;
   subscale: string;
@@ -173,38 +174,28 @@ function buildScoreRows(
 }[] {
   const rows: ReturnType<typeof buildScoreRows> = [];
 
-  // Handle CBI (has subscales object + total)
+  // CBI: subscales object (personal_burnout, work_burnout, client_burnout)
   if (result.subscales) {
     for (const [key, val] of Object.entries<any>(result.subscales)) {
-      rows.push({
-        respondentId,
-        subscale: key,
-        rawScore: val.score,
-        scaledScore: val.score,
-        band: val.band,
-      });
+      rows.push({ respondentId, subscale: key, rawScore: val.score, scaledScore: val.score, band: val.band });
     }
   }
-  // Handle PSS / WHO5 total
+
+  // PSS / WHO-5 / CBI total
   if (result.total) {
-    rows.push({
-      respondentId,
-      subscale: "total",
-      rawScore: result.total.raw_score ?? result.total.score,
-      scaledScore: result.total.score,
-      band: result.total.band,
-    });
+    const rawScore    = result.total.raw_score ?? result.total.score;
+    // PSS returns raw 0–40; normalize to 0–100 to match every other assessment.
+    // WHO-5 already returns percentage_score (0–100) as result.total.score.
+    const scaledScore = assessmentType === "PSS"
+      ? Math.round((result.total.score / 40) * 1000) / 10
+      : result.total.score;
+    rows.push({ respondentId, subscale: "total", rawScore, scaledScore, band: result.total.band });
   }
-  // Handle Culture (dimensions array + total)
+
+  // Culture: dimensions array
   if (result.dimensions) {
     for (const dim of result.dimensions as any[]) {
-      rows.push({
-        respondentId,
-        subscale: dim.key,
-        rawScore: dim.score,
-        scaledScore: dim.score,
-        band: dim.band,
-      });
+      rows.push({ respondentId, subscale: dim.key, rawScore: dim.score, scaledScore: dim.score, band: dim.band });
     }
   }
 
@@ -226,22 +217,18 @@ async function computeGroupAverage(
     select: { subscale: true, scaledScore: true, band: true },
   });
 
-  const grouped: Record<string, number[]> = {};
+  const grouped: Record<string, { vals: number[]; bands: Record<string, number> }> = {};
   for (const s of scores) {
-    (grouped[s.subscale] ??= []).push(s.scaledScore);
+    const g = (grouped[s.subscale] ??= { vals: [], bands: {} });
+    g.vals.push(s.scaledScore);
+    g.bands[s.band] = (g.bands[s.band] ?? 0) + 1;
   }
 
   const result: Record<string, { avg: number; band: string }> = {};
-  for (const [subscale, vals] of Object.entries(grouped)) {
-    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-    result[subscale] = { avg: Math.round(avg * 10) / 10, band: bandFromScore(avg) };
+  for (const [subscale, { vals, bands }] of Object.entries(grouped)) {
+    const avg      = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const modBand  = Object.entries(bands).reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+    result[subscale] = { avg: Math.round(avg * 10) / 10, band: modBand };
   }
   return result;
-}
-
-function bandFromScore(score: number): string {
-  if (score < 29) return "Low";
-  if (score < 51) return "Below Average";
-  if (score < 68) return "Moderate";
-  return "Good";
 }

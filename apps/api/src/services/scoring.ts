@@ -52,9 +52,19 @@ export interface TrendPoint {
   avgTotal: number | null;   // overall "total" subscale mean, 0–100
 }
 
-// ─── Band helper ─────────────────────────────────────────────────────────────
-// Generic 0–100 bands used for averages that span assessment types.
+// ─── Band helpers ─────────────────────────────────────────────────────────────
 
+// Returns the most-common band from a bandDistribution object.
+// Used for aggregated subscale results so we propagate Python-computed
+// bands rather than re-deriving them from an averaged score.
+function modalBand(dist: Record<string, number>): string {
+  const entries = Object.entries(dist);
+  if (entries.length === 0) return "Unknown";
+  return entries.reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+}
+
+// Kept for use outside this service (e.g. one-off computations where the
+// assessment type is unknown). Prefer modalBand() for aggregated results.
 export function genericBand(score: number): string {
   if (score >= 68) return "Good";
   if (score >= 51) return "Moderate";
@@ -168,7 +178,9 @@ export async function aggregateCycleScores(
     max: round(g._max.scaledScore, 1),
     stddev: stddevMap[g.subscale] ?? 0,
     count: g._count.id,
-    band: genericBand(g._avg.scaledScore ?? 0),
+    // Use the modal (most common) Python-computed band across respondents rather
+    // than re-deriving from the average, which loses assessment-type context.
+    band: modalBand(bandMap[g.subscale] ?? {}),
     bandDistribution: bandMap[g.subscale] ?? {},
   }));
 
