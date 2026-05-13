@@ -639,7 +639,7 @@ function EmployeeListSection({
   const [summary,    setSummary]    = useState<{ total: number; byDepartment: { department: string; count: number }[] } | null>(null);
   const [uploading,  setUploading]  = useState(false);
   const [uploadMsg,  setUploadMsg]  = useState<{ text: string; ok: boolean } | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null); // kept for value-reset after upload
 
   useEffect(() => {
     fetch(`${API_BASE}/admin/organisations/${orgId}/employees/summary`, { headers: authHeader() })
@@ -706,31 +706,21 @@ function EmployeeListSection({
               : "Upload a CSV with two columns: email and department. Used automatically when cycles are created."}
           </p>
         </div>
-        <div className="shrink-0">
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={() => fileRef.current?.click()}
-            className={[
-              "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors",
-              uploading
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                : "bg-brand-500 text-white hover:bg-brand-600 cursor-pointer",
-            ].join(" ")}
-          >
-            {uploading
-              ? (lang === "ar" ? "جارٍ الرفع…" : "Uploading…")
-              : (lang === "ar" ? "رفع CSV" : "Upload CSV")}
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            disabled={uploading}
-            onChange={handleFile}
-          />
-        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,text/csv"
+          disabled={uploading}
+          onChange={handleFile}
+          className={[
+            "shrink-0 text-sm text-gray-500",
+            "file:px-4 file:py-2 file:rounded-xl file:border-0",
+            "file:text-sm file:font-semibold file:cursor-pointer file:transition-colors",
+            uploading
+              ? "file:bg-gray-100 file:text-gray-400 opacity-60 cursor-not-allowed"
+              : "file:bg-brand-500 file:text-white hover:file:bg-brand-600",
+          ].join(" ")}
+        />
       </div>
 
       {uploadMsg && (
