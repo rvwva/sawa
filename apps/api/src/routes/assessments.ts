@@ -128,16 +128,16 @@ assessmentsRouter.patch(
 
     let { recipientEmails } = req.body as { recipientEmails?: string[] };
 
+    // Fetch full employee list once — used for recipients, dept links, and routing
+    const allEmployees = await prisma.employee.findMany({
+      where:  { organisationId: cycle.organisationId },
+      select: { email: true, department: true },
+    });
+
     // If no emails supplied, fall back to the org's uploaded employee list
-    if (!recipientEmails || recipientEmails.length === 0) {
-      const employees = await prisma.employee.findMany({
-        where:  { organisationId: cycle.organisationId },
-        select: { email: true },
-      });
-      if (employees.length > 0) {
-        recipientEmails = employees.map((e) => e.email);
-        logger.info(`Auto-populated ${recipientEmails.length} recipients from employee list`, { cycleId: cycle.id });
-      }
+    if ((!recipientEmails || recipientEmails.length === 0) && allEmployees.length > 0) {
+      recipientEmails = allEmployees.map((e) => e.email);
+      logger.info(`Auto-populated ${recipientEmails.length} recipients from employee list`, { cycleId: cycle.id });
     }
 
     // Persist recipient list on the cycle for automated reminders later
@@ -156,34 +156,61 @@ assessmentsRouter.patch(
     });
 
     // Generate one department-specific link per unique department in the employee list
-    const deptEmployees = await prisma.employee.findMany({
-      where: { organisationId: cycle.organisationId, department: { not: null } },
-      select: { department: true },
-    });
     const uniqueDepts = [...new Set(
-      deptEmployees.map((e) => e.department).filter((d): d is string => !!d)
+      allEmployees.map((e) => e.department).filter((d): d is string => !!d)
     )];
+    let deptLinkMap = new Map<string, string>(); // dept name (lower) → link token
     if (uniqueDepts.length > 0) {
       await prisma.cycleDepartmentLink.createMany({
         data: uniqueDepts.map((departmentName) => ({ cycleId: cycle.id, departmentName })),
         skipDuplicates: true,
       });
+      const deptLinks = await prisma.cycleDepartmentLink.findMany({
+        where:  { cycleId: cycle.id },
+        select: { departmentName: true, token: true },
+      });
+      deptLinkMap = new Map(deptLinks.map((l) => [l.departmentName.toLowerCase(), l.token]));
       logger.info(`Generated ${uniqueDepts.length} department links`, { cycleId: cycle.id });
     }
 
-    // Send invitations (non-blocking)
+    // Send personalized invitations — each employee gets their department-specific link
     if (recipientEmails && recipientEmails.length > 0) {
       const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-      sendCycleInvite({
-        recipientEmails,
+      const baseParams = {
         organisationName:   cycle.organisation.name,
         organisationNameAr: cycle.organisation.nameAr ?? undefined,
         assessmentName:     cycle.assessment.name,
         assessmentNameAr:   cycle.assessment.nameAr ?? undefined,
         cycleTitle:         cycle.title,
-        assessmentUrl:      `${appUrl}/assess/${cycle.linkToken}`,
         endsAt:             cycle.endsAt,
-      }).catch((err) => logger.error("sendCycleInvite failed", { err }));
+      };
+
+      if (deptLinkMap.size > 0) {
+        // Build email → dept lookup from the employee list
+        const emailDeptMap = new Map(allEmployees.map((e) => [e.email, e.department ?? null]));
+        const generalUrl = `${appUrl}/assess/${cycle.linkToken}`;
+
+        // Group recipients by the URL they should receive
+        const urlGroups = new Map<string, string[]>();
+        for (const email of recipientEmails) {
+          const dept  = emailDeptMap.get(email);
+          const token = dept ? deptLinkMap.get(dept.toLowerCase()) : undefined;
+          const url   = token ? `${appUrl}/assess/${token}` : generalUrl;
+          const group = urlGroups.get(url) ?? [];
+          group.push(email);
+          urlGroups.set(url, group);
+        }
+
+        // One sendCycleInvite call per unique dept URL (non-blocking)
+        for (const [assessmentUrl, emails] of urlGroups) {
+          sendCycleInvite({ ...baseParams, recipientEmails: emails, assessmentUrl })
+            .catch((err) => logger.error("sendCycleInvite failed", { err, assessmentUrl, count: emails.length }));
+        }
+      } else {
+        // No dept links — send the general link to everyone
+        sendCycleInvite({ ...baseParams, recipientEmails, assessmentUrl: `${appUrl}/assess/${cycle.linkToken}` })
+          .catch((err) => logger.error("sendCycleInvite failed", { err }));
+      }
     }
 
     return res.json(updated);
