@@ -201,6 +201,7 @@ function CyclesTab({
 }: { org: OrgDetail; lang: string; t: (k: any) => string; reload: () => void; authHeader: () => Record<string, string> }) {
   const [showForm, setShowForm] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [employeeCount, setEmployeeCount] = useState<number | null>(null);
 
   // New cycle form state
   const [type,   setType]   = useState("CBI");
@@ -210,6 +211,13 @@ function CyclesTab({
   const [emails, setEmails] = useState("");
   const [creating, setCreating] = useState(false);
   const [formErr,  setFormErr]  = useState("");
+
+  useEffect(() => {
+    fetch(`${API_BASE}/admin/organisations/${org.id}/employees/summary`, { headers: authHeader() })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setEmployeeCount(d.total ?? 0); })
+      .catch(() => {});
+  }, [org.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function createCycle(e: React.FormEvent) {
     e.preventDefault();
@@ -330,18 +338,29 @@ function CyclesTab({
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">{t("admin_cycle_emails")}</label>
-              <textarea
-                rows={5}
-                value={emails}
-                onChange={(e) => setEmails(e.target.value)}
-                className={INPUT + " font-mono resize-y"}
-                placeholder={"employee@company.com\nanother@company.com"}
-                dir="ltr"
-              />
-              <p className="mt-1 text-xs text-gray-400">{t("admin_cycle_emails_hint")}</p>
-            </div>
+            {employeeCount != null && employeeCount > 0 ? (
+              <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                <span className="text-green-500 mt-0.5 text-base" aria-hidden>✓</span>
+                <p className="text-sm text-green-800">
+                  {lang === "ar"
+                    ? `سيتم إشعار ${employeeCount} موظف من قائمة الموظفين المرفوعة.`
+                    : `${employeeCount} ${employeeCount === 1 ? "employee" : "employees"} will be notified from your uploaded employee list.`}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t("admin_cycle_emails")}</label>
+                <textarea
+                  rows={5}
+                  value={emails}
+                  onChange={(e) => setEmails(e.target.value)}
+                  className={INPUT + " font-mono resize-y"}
+                  placeholder={"employee@company.com\nanother@company.com"}
+                  dir="ltr"
+                />
+                <p className="mt-1 text-xs text-gray-400">{t("admin_cycle_emails_hint")}</p>
+              </div>
+            )}
 
             <div className="flex gap-3 pt-1">
               <button
