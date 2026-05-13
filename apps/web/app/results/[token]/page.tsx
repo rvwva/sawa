@@ -296,8 +296,8 @@ export default function ResultsPage() {
                 </h2>
                 <p className="text-xs text-gray-400 mb-4">
                   {lang === "ar"
-                    ? "تُعرض الأقسام التي لديها 5 مشاركين أو أكثر فقط."
-                    : "Only departments with 5 or more respondents are shown."}
+                    ? "تُعرض الأقسام التي لديها مشارك واحد أو أكثر فقط."
+                    : "Only departments with 1 or more respondents are shown."}
                 </p>
 
                 <div className="space-y-6">
@@ -338,8 +338,8 @@ export default function ResultsPage() {
             {data.departments.length === 0 && (
               <div className="text-center text-sm text-gray-400 py-2">
                 {lang === "ar"
-                  ? "لا توجد أقسام تستوفي الحد الأدنى من المشاركين (5) لعرض نتائجها."
-                  : "No departments met the minimum respondent threshold (5) for display."}
+                  ? "لا توجد أقسام تستوفي الحد الأدنى من المشاركين (1) لعرض نتائجها."
+                  : "No departments met the minimum respondent threshold (1) for display."}
               </div>
             )}
           </>

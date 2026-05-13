@@ -113,6 +113,7 @@ export default function AssessmentPage() {
   const [stage, setStage] = useState<Stage>("loading");
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [selectedDeptId, setSelectedDeptId] = useState<string | undefined>();
+  const [respondentEmail, setRespondentEmail] = useState<string | undefined>();
 
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -139,7 +140,8 @@ export default function AssessmentPage() {
 
   const hasDepts = (cycleInfo?.departments?.length ?? 0) > 0;
 
-  function handleConsentAccepted() {
+  function handleConsentAccepted(email?: string) {
+    setRespondentEmail(email);
     setStage(hasDepts ? "department" : "form");
   }
 
@@ -233,6 +235,7 @@ export default function AssessmentPage() {
             token={token}
             cycleInfo={cycleInfo}
             departmentId={selectedDeptId}
+            respondentEmail={respondentEmail}
             onComplete={handleFormComplete}
           />
         )}

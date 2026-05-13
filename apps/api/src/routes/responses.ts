@@ -42,7 +42,7 @@ responsesRouter.post(
     }
 
     try {
-      const { cycleToken, departmentId, consentVersion, responses } = req.body;
+      const { cycleToken, departmentId, respondentEmail, consentVersion, responses } = req.body;
 
       const cycle = await prisma.assessmentCycle.findUnique({
         where: { linkToken: cycleToken },
@@ -53,6 +53,23 @@ responsesRouter.post(
       if (cycle.status !== "ACTIVE") return res.status(410).json({ error: "Assessment not active" });
       if (new Date() > cycle.endsAt) return res.status(410).json({ error: "Assessment expired" });
 
+      // Resolve departmentId: prefer explicit selection, fall back to employee lookup by email
+      let resolvedDeptId: string | null = departmentId ?? null;
+      if (!resolvedDeptId && respondentEmail) {
+        const employee = await prisma.employee.findUnique({
+          where: { organisationId_email: { organisationId: cycle.organisationId, email: respondentEmail.trim().toLowerCase() } },
+        });
+        if (employee?.department) {
+          const dept = await prisma.department.findFirst({
+            where: {
+              organisationId: cycle.organisationId,
+              name: { equals: employee.department, mode: "insensitive" },
+            },
+          });
+          resolvedDeptId = dept?.id ?? null;
+        }
+      }
+
       const clientIp =
         (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ??
         req.socket.remoteAddress ??
@@ -61,7 +78,7 @@ responsesRouter.post(
       const respondent = await prisma.respondent.create({
         data: {
           cycleId: cycle.id,
-          departmentId: departmentId ?? null,
+          departmentId: resolvedDeptId,
           consentGiven: true,
           consentAt: new Date(),
           consentIp: clientIp,

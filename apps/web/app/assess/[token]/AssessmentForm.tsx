@@ -38,6 +38,7 @@ type Props = {
   token: string;
   cycleInfo: CycleInfo;
   departmentId?: string;
+  respondentEmail?: string;
   onComplete: (result: SubmissionResult) => void;
 };
 
@@ -46,6 +47,7 @@ export default function AssessmentForm({
   token,
   cycleInfo,
   departmentId,
+  respondentEmail,
   onComplete,
 }: Props) {
   const t = useTranslations(lang);
@@ -88,6 +90,7 @@ export default function AssessmentForm({
         body: JSON.stringify({
           cycleToken: token,
           departmentId: departmentId ?? null,
+          respondentEmail: respondentEmail ?? null,
           responses: data,
           consentGiven: "true",
           consentVersion: "1.0",
