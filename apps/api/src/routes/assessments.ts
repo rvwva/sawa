@@ -420,7 +420,7 @@ assessmentsRouter.get(
         include: { cycle: { include: cycleInclude } },
       });
       if (deptLink) {
-        cycle = deptLink.cycle as typeof cycle;
+        cycle = deptLink.cycle as NonNullable<typeof cycle>;
         departmentLinkToken = deptLink.token;
       }
     }
