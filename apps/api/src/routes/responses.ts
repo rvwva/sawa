@@ -44,6 +44,12 @@ responsesRouter.post(
     try {
       const { cycleToken, departmentId, departmentLinkToken, consentVersion, responses } = req.body;
 
+      logger.info("submit: received", {
+        cycleToken,
+        departmentLinkToken: departmentLinkToken ?? null,
+        explicitDepartmentId: departmentId ?? null,
+      });
+
       // Try direct cycle linkToken first (regular link), then resolve via dept link token
       let cycle = await prisma.assessmentCycle.findUnique({
         where: { linkToken: cycleToken },
@@ -52,8 +58,9 @@ responsesRouter.post(
       let resolvedDeptName: string | null = null;
 
       if (!cycle) {
-        // When the employee arrived via a dept link, cycleToken is the dept link token
+        // When the employee arrived via a dept link, cycleToken IS the dept link token
         const lookupToken = departmentLinkToken ?? cycleToken;
+        logger.info("submit: cycle not found by linkToken, trying dept link", { lookupToken });
         const deptLink = await prisma.cycleDepartmentLink.findUnique({
           where:   { token: lookupToken },
           include: { cycle: { include: { assessment: true } } },
@@ -61,6 +68,12 @@ responsesRouter.post(
         if (deptLink) {
           cycle = deptLink.cycle;
           resolvedDeptName = deptLink.departmentName;
+          logger.info("submit: resolved cycle via dept link", {
+            cycleId: cycle.id,
+            departmentName: resolvedDeptName,
+          });
+        } else {
+          logger.warn("submit: no cycle or dept link found", { lookupToken });
         }
       }
 
@@ -74,16 +87,33 @@ responsesRouter.post(
         const deptName = resolvedDeptName ?? await prisma.cycleDepartmentLink
           .findUnique({ where: { token: departmentLinkToken } })
           .then((l) => l?.departmentName ?? null);
+
+        logger.info("submit: resolving department", {
+          deptName,
+          organisationId: cycle.organisationId,
+        });
+
         if (deptName) {
-          const dept = await prisma.department.findFirst({
-            where: {
-              organisationId: cycle.organisationId,
-              name: { equals: deptName, mode: "insensitive" },
-            },
+          // Find existing Department record; auto-create if absent (dept names come
+          // from the employees CSV and may not have a matching Department row yet)
+          let dept = await prisma.department.findFirst({
+            where: { organisationId: cycle.organisationId, name: { equals: deptName, mode: "insensitive" } },
           });
-          resolvedDeptId = dept?.id ?? null;
+          if (!dept) {
+            dept = await prisma.department.create({
+              data: { organisationId: cycle.organisationId, name: deptName },
+            });
+            logger.info("submit: auto-created Department record", { name: deptName, id: dept.id });
+          }
+          resolvedDeptId = dept.id;
+          logger.info("submit: department resolved", { departmentId: resolvedDeptId, departmentName: deptName });
         }
       }
+
+      logger.info("submit: creating respondent", {
+        cycleId: cycle.id,
+        resolvedDeptId,
+      });
 
       const clientIp =
         (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ??
