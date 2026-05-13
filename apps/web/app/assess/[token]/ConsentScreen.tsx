@@ -7,7 +7,7 @@ import type { CycleInfo } from "./page";
 type Props = {
   lang: Lang;
   cycleInfo: CycleInfo;
-  onAccept: (email?: string) => void;
+  onAccept: () => void;
 };
 
 const privacyItems = (t: ReturnType<typeof useTranslations>) => [
@@ -42,7 +42,6 @@ export default function ConsentScreen({ lang, cycleInfo, onAccept }: Props) {
   const t = useTranslations(lang);
   const [checked,   setChecked]   = useState(false);
   const [showError, setShowError] = useState(false);
-  const [email,     setEmail]     = useState("");
 
   const assessmentName =
     lang === "ar" && cycleInfo.assessment.nameAr
@@ -53,7 +52,7 @@ export default function ConsentScreen({ lang, cycleInfo, onAccept }: Props) {
 
   function handleCta() {
     if (!checked) { setShowError(true); return; }
-    onAccept(email.trim().toLowerCase() || undefined);
+    onAccept();
   }
 
   return (
@@ -104,25 +103,6 @@ export default function ConsentScreen({ lang, cycleInfo, onAccept }: Props) {
 
       {/* Consent checkbox + CTA */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-5 space-y-4">
-        {/* Optional email for department auto-assignment */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {lang === "ar" ? "البريد الإلكتروني (اختياري)" : "Work email (optional)"}
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={lang === "ar" ? "name@company.com" : "name@company.com"}
-            className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-brand-400 focus:border-brand-400 outline-none transition-all"
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            {lang === "ar"
-              ? "يُستخدم فقط لتحديد قسمك تلقائياً. لا يُخزَّن مع إجاباتك."
-              : "Used only to auto-assign your department. Never stored with your responses."}
-          </p>
-        </div>
-
         <label className="flex gap-3 cursor-pointer group">
           <div className="relative shrink-0 mt-0.5">
             <input

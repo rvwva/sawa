@@ -42,7 +42,7 @@ responsesRouter.post(
     }
 
     try {
-      const { cycleToken, departmentId, respondentEmail, consentVersion, responses } = req.body;
+      const { cycleToken, departmentId, departmentLinkToken, consentVersion, responses } = req.body;
 
       const cycle = await prisma.assessmentCycle.findUnique({
         where: { linkToken: cycleToken },
@@ -53,17 +53,17 @@ responsesRouter.post(
       if (cycle.status !== "ACTIVE") return res.status(410).json({ error: "Assessment not active" });
       if (new Date() > cycle.endsAt) return res.status(410).json({ error: "Assessment expired" });
 
-      // Resolve departmentId: prefer explicit selection, fall back to employee lookup by email
+      // Resolve departmentId: prefer explicit selector choice, then dept link token
       let resolvedDeptId: string | null = departmentId ?? null;
-      if (!resolvedDeptId && respondentEmail) {
-        const employee = await prisma.employee.findUnique({
-          where: { organisationId_email: { organisationId: cycle.organisationId, email: respondentEmail.trim().toLowerCase() } },
+      if (!resolvedDeptId && departmentLinkToken) {
+        const deptLink = await prisma.cycleDepartmentLink.findUnique({
+          where: { token: departmentLinkToken },
         });
-        if (employee?.department) {
+        if (deptLink?.departmentName) {
           const dept = await prisma.department.findFirst({
             where: {
               organisationId: cycle.organisationId,
-              name: { equals: employee.department, mode: "insensitive" },
+              name: { equals: deptLink.departmentName, mode: "insensitive" },
             },
           });
           resolvedDeptId = dept?.id ?? null;

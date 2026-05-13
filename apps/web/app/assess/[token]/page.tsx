@@ -29,6 +29,7 @@ export type CycleInfo = {
     logoUrl?: string;
   };
   departments: Array<{ id: string; name: string; nameAr?: string }>;
+  departmentLinkToken?: string;
 };
 
 export type SubmissionResult = {
@@ -113,7 +114,6 @@ export default function AssessmentPage() {
   const [stage, setStage] = useState<Stage>("loading");
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [selectedDeptId, setSelectedDeptId] = useState<string | undefined>();
-  const [respondentEmail, setRespondentEmail] = useState<string | undefined>();
 
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -140,9 +140,9 @@ export default function AssessmentPage() {
 
   const hasDepts = (cycleInfo?.departments?.length ?? 0) > 0;
 
-  function handleConsentAccepted(email?: string) {
-    setRespondentEmail(email);
-    setStage(hasDepts ? "department" : "form");
+  function handleConsentAccepted() {
+    // Skip the department selector if the URL was already a department-specific link
+    setStage(hasDepts && !cycleInfo?.departmentLinkToken ? "department" : "form");
   }
 
   function handleDeptSelected(deptId: string | undefined) {
@@ -235,7 +235,7 @@ export default function AssessmentPage() {
             token={token}
             cycleInfo={cycleInfo}
             departmentId={selectedDeptId}
-            respondentEmail={respondentEmail}
+            departmentLinkToken={cycleInfo.departmentLinkToken}
             onComplete={handleFormComplete}
           />
         )}

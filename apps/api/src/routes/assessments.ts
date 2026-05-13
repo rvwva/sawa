@@ -155,6 +155,22 @@ assessmentsRouter.patch(
       userId: req.user!.userId, entityType: "AssessmentCycle", entityId: cycle.id, req,
     });
 
+    // Generate one department-specific link per unique department in the employee list
+    const deptEmployees = await prisma.employee.findMany({
+      where: { organisationId: cycle.organisationId, department: { not: null } },
+      select: { department: true },
+    });
+    const uniqueDepts = [...new Set(
+      deptEmployees.map((e) => e.department).filter((d): d is string => !!d)
+    )];
+    if (uniqueDepts.length > 0) {
+      await prisma.cycleDepartmentLink.createMany({
+        data: uniqueDepts.map((departmentName) => ({ cycleId: cycle.id, departmentName })),
+        skipDuplicates: true,
+      });
+      logger.info(`Generated ${uniqueDepts.length} department links`, { cycleId: cycle.id });
+    }
+
     // Send invitations (non-blocking)
     if (recipientEmails && recipientEmails.length > 0) {
       const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -376,27 +392,42 @@ assessmentsRouter.patch(
 assessmentsRouter.get(
   "/cycles/by-token/:token",
   async (req: Request, res: Response) => {
-    const cycle = await prisma.assessmentCycle.findUnique({
-      where: { linkToken: req.params.token },
-      include: {
-        assessment: {
-          select: { type: true, name: true, nameAr: true, description: true, itemCount: true },
-        },
-        organisation: {
-          select: {
-            id: true, name: true, nameAr: true, logoUrl: true,
-            departments: {
-              select: { id: true, name: true, nameAr: true },
-              orderBy: { name: "asc" },
-            },
+    const cycleInclude = {
+      assessment: {
+        select: { type: true, name: true, nameAr: true, description: true, itemCount: true },
+      },
+      organisation: {
+        select: {
+          id: true, name: true, nameAr: true, logoUrl: true,
+          departments: {
+            select: { id: true, name: true, nameAr: true },
+            orderBy: { name: "asc" as const },
           },
         },
       },
-    });
+    };
 
-    if (!cycle)                return res.status(404).json({ error: "Assessment link not found" });
+    // Try the main cycle token first, then fall back to a department link token
+    let cycle = await prisma.assessmentCycle.findUnique({
+      where: { linkToken: req.params.token },
+      include: cycleInclude,
+    });
+    let departmentLinkToken: string | null = null;
+
+    if (!cycle) {
+      const deptLink = await prisma.cycleDepartmentLink.findUnique({
+        where: { token: req.params.token },
+        include: { cycle: { include: cycleInclude } },
+      });
+      if (deptLink) {
+        cycle = deptLink.cycle as typeof cycle;
+        departmentLinkToken = deptLink.token;
+      }
+    }
+
+    if (!cycle)                    return res.status(404).json({ error: "Assessment link not found" });
     if (cycle.status !== "ACTIVE") return res.status(410).json({ error: "This assessment is no longer active" });
-    if (new Date() > cycle.endsAt)  return res.status(410).json({ error: "This assessment has expired" });
+    if (new Date() > cycle.endsAt) return res.status(410).json({ error: "This assessment has expired" });
 
     const { departments, ...org } = cycle.organisation;
     return res.json({
@@ -406,6 +437,7 @@ assessmentsRouter.get(
       assessment:   cycle.assessment,
       organisation: org,
       departments,
+      ...(departmentLinkToken ? { departmentLinkToken } : {}),
     });
   }
 );
@@ -490,9 +522,10 @@ assessmentsRouter.get(
       const cycle = await prisma.assessmentCycle.findUnique({
         where: { id: req.params.id },
         include: {
-          assessment: { select: { type: true, name: true, nameAr: true } },
-          organisation: { select: { id: true, name: true, nameAr: true } },
-          _count: { select: { respondents: true } },
+          assessment:      { select: { type: true, name: true, nameAr: true } },
+          organisation:    { select: { id: true, name: true, nameAr: true } },
+          departmentLinks: { select: { id: true, departmentName: true, token: true }, orderBy: { departmentName: "asc" } },
+          _count:          { select: { respondents: true } },
         },
       });
       if (!cycle) return res.status(404).json({ error: "Cycle not found" });

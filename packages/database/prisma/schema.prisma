@@ -177,10 +177,11 @@ model AssessmentCycle {
   createdAt          DateTime       @default(now()) @map("created_at")
   updatedAt          DateTime       @updatedAt @map("updated_at")
 
-  organisation Organisation  @relation(fields: [organisationId], references: [id])
-  assessment   Assessment    @relation(fields: [assessmentId], references: [id])
-  respondents  Respondent[]
-  reports      Report[]
+  organisation     Organisation         @relation(fields: [organisationId], references: [id])
+  assessment       Assessment           @relation(fields: [assessmentId], references: [id])
+  respondents      Respondent[]
+  reports          Report[]
+  departmentLinks  CycleDepartmentLink[]
 
   @@map("assessment_cycles")
 }
@@ -298,6 +299,22 @@ model Employee {
 
   @@unique([organisationId, email])
   @@map("employees")
+}
+
+// ─── Department-specific assessment links ────────────────────────────────────
+// One opaque token per department per cycle. Employees who use a dept link
+// have their response automatically tagged with that department — no selector.
+
+model CycleDepartmentLink {
+  id             String          @id @default(cuid())
+  cycleId        String          @map("cycle_id")
+  departmentName String          @map("department_name")
+  token          String          @unique @default(cuid())
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  cycle AssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  @@map("cycle_department_links")
 }
 
 // ─── Data Deletion Requests (GDPR/PDPL compliance) ──────────────────────────
