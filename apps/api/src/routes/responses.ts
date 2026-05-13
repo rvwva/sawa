@@ -44,26 +44,41 @@ responsesRouter.post(
     try {
       const { cycleToken, departmentId, departmentLinkToken, consentVersion, responses } = req.body;
 
-      const cycle = await prisma.assessmentCycle.findUnique({
+      // Try direct cycle linkToken first (regular link), then resolve via dept link token
+      let cycle = await prisma.assessmentCycle.findUnique({
         where: { linkToken: cycleToken },
         include: { assessment: true },
       });
+      let resolvedDeptName: string | null = null;
+
+      if (!cycle) {
+        // When the employee arrived via a dept link, cycleToken is the dept link token
+        const lookupToken = departmentLinkToken ?? cycleToken;
+        const deptLink = await prisma.cycleDepartmentLink.findUnique({
+          where:   { token: lookupToken },
+          include: { cycle: { include: { assessment: true } } },
+        });
+        if (deptLink) {
+          cycle = deptLink.cycle;
+          resolvedDeptName = deptLink.departmentName;
+        }
+      }
 
       if (!cycle) return res.status(404).json({ error: "Assessment link not found" });
       if (cycle.status !== "ACTIVE") return res.status(410).json({ error: "Assessment not active" });
       if (new Date() > cycle.endsAt) return res.status(410).json({ error: "Assessment expired" });
 
-      // Resolve departmentId: prefer explicit selector choice, then dept link token
+      // Resolve departmentId: explicit selector > dept link name > nothing
       let resolvedDeptId: string | null = departmentId ?? null;
-      if (!resolvedDeptId && departmentLinkToken) {
-        const deptLink = await prisma.cycleDepartmentLink.findUnique({
-          where: { token: departmentLinkToken },
-        });
-        if (deptLink?.departmentName) {
+      if (!resolvedDeptId && (resolvedDeptName || departmentLinkToken)) {
+        const deptName = resolvedDeptName ?? await prisma.cycleDepartmentLink
+          .findUnique({ where: { token: departmentLinkToken } })
+          .then((l) => l?.departmentName ?? null);
+        if (deptName) {
           const dept = await prisma.department.findFirst({
             where: {
               organisationId: cycle.organisationId,
-              name: { equals: deptLink.departmentName, mode: "insensitive" },
+              name: { equals: deptName, mode: "insensitive" },
             },
           });
           resolvedDeptId = dept?.id ?? null;
