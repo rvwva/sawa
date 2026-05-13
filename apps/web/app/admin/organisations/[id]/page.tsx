@@ -706,13 +706,22 @@ function EmployeeListSection({
               : "Upload a CSV with two columns: email and department. Used automatically when cycles are created."}
           </p>
         </div>
-        <label className={[
-          "shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-colors",
-          uploading ? "bg-gray-100 text-gray-400" : "bg-brand-500 text-white hover:bg-brand-600",
-        ].join(" ")}>
-          {uploading
-            ? (lang === "ar" ? "جارٍ الرفع…" : "Uploading…")
-            : (lang === "ar" ? "رفع CSV" : "Upload CSV")}
+        <div className="shrink-0">
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
+            className={[
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors",
+              uploading
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "bg-brand-500 text-white hover:bg-brand-600 cursor-pointer",
+            ].join(" ")}
+          >
+            {uploading
+              ? (lang === "ar" ? "جارٍ الرفع…" : "Uploading…")
+              : (lang === "ar" ? "رفع CSV" : "Upload CSV")}
+          </button>
           <input
             ref={fileRef}
             type="file"
@@ -721,7 +730,7 @@ function EmployeeListSection({
             disabled={uploading}
             onChange={handleFile}
           />
-        </label>
+        </div>
       </div>
 
       {uploadMsg && (
