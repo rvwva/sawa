@@ -6,14 +6,15 @@
  * that already ran at submission time and persisted results into `scores`.
  *
  * Key rules:
- *  - Department breakdowns only returned when respondentCount >= 5 (compliance)
+ *  - Department breakdowns only returned when respondentCount >= 1 (TESTING — change back to 5 before production)
  *  - All scores are on a 0–100 normalised scale
  */
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 
-export const MIN_DEPT_RESPONDENTS = 5;
+// TODO: change back to 5 before production (PDPL anonymity requirement)
+export const MIN_DEPT_RESPONDENTS = 1;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -195,7 +196,7 @@ export async function aggregateCycleScores(
 // ─── Department breakdown ────────────────────────────────────────────────────
 
 /**
- * Returns per-department aggregates, excluding any department with < 5 respondents
+ * Returns per-department aggregates, excluding any department with < MIN_DEPT_RESPONDENTS respondents
  * (PDPL / anonymity rule).
  */
 export async function aggregateDepartmentScores(

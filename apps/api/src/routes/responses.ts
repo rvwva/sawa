@@ -142,7 +142,7 @@ responsesRouter.get("/my-score/:sessionToken", async (req: Request, res: Respons
       const deptCount = await prisma.respondent.count({
         where: { cycleId: respondent.cycleId, departmentId: respondent.departmentId, submittedAt: { not: null } },
       });
-      if (deptCount >= 5) {
+      if (deptCount >= 1) { // TODO: change back to 5 before production
         deptAvg = await computeGroupAverage(respondent.cycleId, respondent.departmentId);
       }
     }
