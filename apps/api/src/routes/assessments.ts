@@ -391,19 +391,55 @@ assessmentsRouter.patch(
       data:  { resultsPublishedAt: new Date() },
     });
 
-    // Send team pulse to stored recipient list (non-blocking)
+    // Send dept-scoped results links — each employee sees only their dept + company overall
     const emails = (cycle.recipientEmails as string[] | null) ?? [];
     if (emails.length > 0) {
       const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-      sendTeamPulseNotification({
-        recipientEmails:    emails,
+      const generalResultsUrl = `${appUrl}/results/${cycle.linkToken}`;
+
+      const [allEmployees, deptLinks] = await Promise.all([
+        prisma.employee.findMany({
+          where:  { organisationId: cycle.organisationId },
+          select: { email: true, department: true },
+        }),
+        prisma.cycleDepartmentLink.findMany({
+          where:  { cycleId: cycle.id },
+          select: { departmentName: true, resultsToken: true },
+        }),
+      ]);
+
+      const emailDeptMap   = new Map(allEmployees.map((e) => [e.email, e.department ?? null]));
+      const deptResultsMap = new Map(deptLinks.map((l) => [l.departmentName.toLowerCase(), l.resultsToken]));
+
+      // Group recipients by the results URL they should receive
+      const urlGroups = new Map<string, string[]>();
+      for (const email of emails) {
+        const dept  = emailDeptMap.get(email);
+        const rTok  = dept ? deptResultsMap.get(dept.toLowerCase()) : null;
+        const url   = rTok ? `${appUrl}/results/${rTok}` : generalResultsUrl;
+        const group = urlGroups.get(url) ?? [];
+        group.push(email);
+        urlGroups.set(url, group);
+      }
+
+      const baseParams = {
         organisationName:   cycle.organisation.name,
         organisationNameAr: cycle.organisation.nameAr ?? undefined,
         cycleTitle:         cycle.title,
         assessmentName:     cycle.assessment.name,
         assessmentNameAr:   cycle.assessment.nameAr ?? undefined,
-        resultsUrl:         `${appUrl}/results/${cycle.linkToken}`,
-      }).catch((err) => logger.error("sendTeamPulseNotification failed", { err }));
+      };
+
+      for (const [resultsUrl, recipientEmails] of urlGroups) {
+        sendTeamPulseNotification({ ...baseParams, recipientEmails, resultsUrl })
+          .catch((err) => logger.error("sendTeamPulseNotification failed", { err, resultsUrl, count: recipientEmails.length }));
+      }
+
+      logger.info("publish: team pulse dispatched", {
+        cycleId: cycle.id,
+        groups: urlGroups.size,
+        total: emails.length,
+      });
     }
 
     return res.json({
@@ -471,19 +507,35 @@ assessmentsRouter.get(
 
 // ─── GET /api/assessments/cycles/results/:token — public team results ─────────
 // Returned only when the cycle's resultsPublishedAt is set. No auth required.
-// Returns aggregated (non-individual) org + department scores.
+// Token may be the cycle's linkToken (all depts) or a CycleDepartmentLink's
+// resultsToken (scoped to that one dept + company overall for comparison).
 
 assessmentsRouter.get(
   "/cycles/results/:token",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const cycle = await prisma.assessmentCycle.findUnique({
-        where: { linkToken: req.params.token },
-        include: {
-          assessment: { select: { type: true, name: true, nameAr: true } },
-          organisation: { select: { name: true, nameAr: true, logoUrl: true } },
-        },
+      const cycleInclude = {
+        assessment:   { select: { type: true, name: true, nameAr: true } },
+        organisation: { select: { name: true, nameAr: true, logoUrl: true } },
+      };
+
+      let cycle = await prisma.assessmentCycle.findUnique({
+        where:   { linkToken: req.params.token },
+        include: cycleInclude,
       });
+      let filterDeptName: string | null = null;
+
+      if (!cycle) {
+        // Try a department-specific results token
+        const deptLink = await prisma.cycleDepartmentLink.findUnique({
+          where:   { resultsToken: req.params.token },
+          include: { cycle: { include: cycleInclude } },
+        });
+        if (deptLink) {
+          cycle = deptLink.cycle as NonNullable<typeof cycle>;
+          filterDeptName = deptLink.departmentName;
+        }
+      }
 
       if (!cycle) return res.status(404).json({ error: "Results not found" });
       if (!cycle.resultsPublishedAt)
@@ -494,19 +546,26 @@ assessmentsRouter.get(
         aggregateDepartmentScores(cycle.id),
       ]);
 
+      // Dept-scoped token: show only the employee's own department
+      const departments = filterDeptName
+        ? deptAggs.filter((d) => d.departmentName.toLowerCase() === filterDeptName!.toLowerCase())
+        : deptAggs;
+
       return res.json({
-        cycleId:           cycle.id,
-        cycleTitle:        cycle.title,
-        assessmentType:    cycle.assessment.type,
-        assessmentName:    cycle.assessment.name,
-        assessmentNameAr:  cycle.assessment.nameAr,
-        organisationName:  cycle.organisation.name,
+        cycleId:            cycle.id,
+        cycleTitle:         cycle.title,
+        assessmentType:     cycle.assessment.type,
+        assessmentName:     cycle.assessment.name,
+        assessmentNameAr:   cycle.assessment.nameAr,
+        organisationName:   cycle.organisation.name,
         organisationNameAr: cycle.organisation.nameAr,
-        logoUrl:           cycle.organisation.logoUrl,
-        respondentCount:   orgAgg?.respondentCount ?? 0,
-        publishedAt:       cycle.resultsPublishedAt,
-        organisation:      orgAgg,
-        departments:       deptAggs,
+        logoUrl:            cycle.organisation.logoUrl,
+        respondentCount:    orgAgg?.respondentCount ?? 0,
+        publishedAt:        cycle.resultsPublishedAt,
+        organisation:       orgAgg,
+        departments,
+        // Let the front-end know this is a dept-scoped view
+        ...(filterDeptName ? { departmentView: filterDeptName } : {}),
       });
     } catch (err) { next(err); }
   }
@@ -551,7 +610,7 @@ assessmentsRouter.get(
         include: {
           assessment:      { select: { type: true, name: true, nameAr: true } },
           organisation:    { select: { id: true, name: true, nameAr: true } },
-          departmentLinks: { select: { id: true, departmentName: true, token: true }, orderBy: { departmentName: "asc" } },
+          departmentLinks: { select: { id: true, departmentName: true, token: true, resultsToken: true }, orderBy: { departmentName: "asc" } },
           _count:          { select: { respondents: true } },
         },
       });

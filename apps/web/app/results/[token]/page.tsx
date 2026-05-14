@@ -37,6 +37,8 @@ type ResultsData = {
   publishedAt: string;
   organisation: { subscales: SubscaleAgg[]; respondentCount: number } | null;
   departments: DeptAgg[];
+  /** Set when the token is dept-scoped; the API has already filtered to 1 dept. */
+  departmentView?: string;
 };
 
 // ─── Label maps ───────────────────────────────────────────────────────────────
@@ -348,7 +350,9 @@ export default function ResultsPage() {
             {data.departments.length > 0 && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <h2 className="font-bold text-gray-900 mb-1">
-                  {lang === "ar" ? "مقارنة الأقسام" : "Department Comparison"}
+                  {data.departmentView
+                    ? (lang === "ar" ? "نتائج قسمك" : "Your Department Results")
+                    : (lang === "ar" ? "مقارنة الأقسام" : "Department Comparison")}
                 </h2>
                 <p className="text-xs text-gray-400 mb-5">
                   {lang === "ar"
@@ -414,9 +418,13 @@ export default function ResultsPage() {
             {data.departments.length === 0 && (
               <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-8 text-center">
                 <p className="text-sm text-gray-400">
-                  {lang === "ar"
-                    ? "لا توجد أقسام تستوفي الحد الأدنى من المشاركين لعرض نتائجها."
-                    : "No departments have enough respondents for breakdown display yet."}
+                  {data.departmentView
+                    ? (lang === "ar"
+                        ? "لا يوجد عدد كافٍ من المشاركين في قسمك لعرض النتائج بشكل مجهول الهوية."
+                        : "Your department doesn't have enough respondents yet to display results anonymously.")
+                    : (lang === "ar"
+                        ? "لا توجد أقسام تستوفي الحد الأدنى من المشاركين لعرض نتائجها."
+                        : "No departments have enough respondents for breakdown display yet.")}
                 </p>
               </div>
             )}

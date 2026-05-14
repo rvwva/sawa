@@ -310,6 +310,8 @@ model CycleDepartmentLink {
   cycleId        String          @map("cycle_id")
   departmentName String          @map("department_name")
   token          String          @unique @default(cuid())
+  // Separate opaque token for the published results URL — scoped to this dept only
+  resultsToken   String          @unique @default(cuid()) @map("results_token")
   createdAt      DateTime        @default(now()) @map("created_at")
 
   cycle AssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)

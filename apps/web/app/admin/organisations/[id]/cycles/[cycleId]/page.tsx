@@ -8,7 +8,7 @@ import { useTranslations } from "@/lib/i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type DeptLink = { id: string; departmentName: string; token: string };
+type DeptLink = { id: string; departmentName: string; token: string; resultsToken: string };
 
 type CycleDetail = {
   id:                 string;
@@ -61,7 +61,8 @@ export default function CycleDetailPage() {
   const [error,   setError]   = useState("");
   const [msg,     setMsg]     = useState<{ text: string; ok: boolean } | null>(null);
   const [copied,  setCopied]  = useState(false);
-  const [copiedDept, setCopiedDept] = useState<string | null>(null);
+  const [copiedDept,        setCopiedDept]        = useState<string | null>(null);
+  const [copiedResultsDept, setCopiedResultsDept] = useState<string | null>(null);
 
   // Recipients editor state
   const [emailInput,   setEmailInput]   = useState("");
@@ -114,6 +115,13 @@ export default function CycleDetailPage() {
     navigator.clipboard.writeText(`${window.location.origin}/assess/${token}`).then(() => {
       setCopiedDept(token);
       setTimeout(() => setCopiedDept(null), 2000);
+    });
+  }
+
+  function copyDeptResultsLink(resultsToken: string) {
+    navigator.clipboard.writeText(`${window.location.origin}/results/${resultsToken}`).then(() => {
+      setCopiedResultsDept(resultsToken);
+      setTimeout(() => setCopiedResultsDept(null), 2000);
     });
   }
 
@@ -324,6 +332,43 @@ export default function CycleDetailPage() {
                     className="shrink-0 px-3 py-1.5 rounded-lg bg-brand-500 text-white text-xs font-semibold hover:bg-brand-600 transition-colors"
                   >
                     {copiedDept === link.token
+                      ? (lang === "ar" ? "تم النسخ" : "Copied!")
+                      : (lang === "ar" ? "نسخ" : "Copy")}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Department results links — visible once results are published */}
+      {(cycle.departmentLinks?.length ?? 0) > 0 && cycle.resultsPublishedAt && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-3">
+          <div>
+            <h2 className="font-semibold text-gray-800">
+              {lang === "ar" ? "روابط نتائج الأقسام" : "Department Results Links"}
+            </h2>
+            <p className="text-xs text-gray-400 mt-1">
+              {lang === "ar"
+                ? "كل رابط يعرض للموظف نتائج قسمه فقط مقارنةً بالمتوسط العام."
+                : "Each link shows employees only their department's results vs. the company average."}
+            </p>
+          </div>
+          <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
+            {cycle.departmentLinks.map((link) => {
+              const url = `${window.location.origin}/results/${link.resultsToken}`;
+              return (
+                <div key={link.id} className="flex items-center gap-3 px-4 py-3 bg-gray-50/40">
+                  <span className="text-sm font-medium text-gray-700 w-32 shrink-0 truncate">
+                    {link.departmentName}
+                  </span>
+                  <code className="flex-1 text-xs text-gray-500 font-mono truncate">{url}</code>
+                  <button
+                    onClick={() => copyDeptResultsLink(link.resultsToken)}
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-brand-500 text-white text-xs font-semibold hover:bg-brand-600 transition-colors"
+                  >
+                    {copiedResultsDept === link.resultsToken
                       ? (lang === "ar" ? "تم النسخ" : "Copied!")
                       : (lang === "ar" ? "نسخ" : "Copy")}
                   </button>
