@@ -42,98 +42,149 @@ type ResultsData = {
 // ─── Label maps ───────────────────────────────────────────────────────────────
 
 const SUBSCALE_AR: Record<string, string> = {
-  // CBI
-  personal_burnout:    "الاحتراق الشخصي",
-  work_burnout:        "احتراق العمل",
-  client_burnout:      "احتراق التعامل مع العملاء",
-  total:               "الإجمالي",
-  // Culture
-  leadership:          "فاعلية القيادة",
-  communication:       "التواصل والشفافية",
-  innovation:          "الابتكار والرشاقة",
-  psychological_safety:"السلامة النفسية",
-  inclusion:           "الشمول والانتماء",
-  growth:              "النمو والتطوير",
-  work_life_balance:   "التوازن بين العمل والحياة",
-  recognition:         "التقدير والمكافأة",
-  collaboration:       "التعاون والعمل الجماعي",
+  personal_burnout:     "الاحتراق الشخصي",
+  work_burnout:         "احتراق العمل",
+  client_burnout:       "احتراق التعامل مع العملاء",
+  total:                "الإجمالي",
+  leadership:           "فاعلية القيادة",
+  communication:        "التواصل والشفافية",
+  innovation:           "الابتكار والرشاقة",
+  psychological_safety: "السلامة النفسية",
+  inclusion:            "الشمول والانتماء",
+  growth:               "النمو والتطوير",
+  work_life_balance:    "التوازن بين العمل والحياة",
+  recognition:          "التقدير والمكافأة",
+  collaboration:        "التعاون والعمل الجماعي",
 };
 
 const BAND_AR: Record<string, string> = {
-  "Good":            "جيد",
-  "Thriving":        "متميز",
-  "Healthy":         "صحي",
-  "Moderate":        "متوسط",
-  "Developing":      "في تطور",
-  "Below Average":   "دون المتوسط",
-  "Low":             "منخفض",
-  "High":            "مرتفع",
-  "Needs Attention": "يحتاج اهتماماً",
-  "Unknown":         "غير محدد",
+  "Good":          "جيد",
+  "Thriving":      "متميز",
+  "Healthy":       "صحي",
+  "Moderate":      "متوسط",
+  "Developing":    "في تطور",
+  "Below Average": "دون المتوسط",
+  "Low":           "منخفض",
+  "High":          "مرتفع",
+  "Needs Attention":"يحتاج اهتماماً",
+  "Unknown":       "غير محدد",
 };
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
 
-function bandColor(band: string): string {
-  if (band === "Good" || band === "Thriving" || band === "Healthy") return "text-green-600";
-  if (band === "Moderate") return "text-amber-600";
-  if (band === "Developing" || band === "Below Average") return "text-orange-500";
-  return "text-red-500"; // Low, High, Needs Attention
+function bandColor(band: string) {
+  if (["Good","Thriving","Healthy"].includes(band)) return "text-emerald-600";
+  if (band === "Moderate") return "text-amber-500";
+  if (["Developing","Below Average"].includes(band)) return "text-orange-500";
+  return "text-red-500";
 }
 
-function bandBg(band: string): string {
-  if (band === "Good" || band === "Thriving" || band === "Healthy") return "bg-green-50 border-green-200 text-green-700";
-  if (band === "Moderate") return "bg-amber-50 border-amber-200 text-amber-700";
-  if (band === "Developing" || band === "Below Average") return "bg-orange-50 border-orange-200 text-orange-700";
+function bandBg(band: string) {
+  if (["Good","Thriving","Healthy"].includes(band))
+    return "bg-emerald-50 border-emerald-200 text-emerald-700";
+  if (band === "Moderate")
+    return "bg-amber-50 border-amber-200 text-amber-700";
+  if (["Developing","Below Average"].includes(band))
+    return "bg-orange-50 border-orange-200 text-orange-700";
   return "bg-red-50 border-red-200 text-red-700";
 }
 
-function barColor(band: string): string {
-  if (band === "Good" || band === "Thriving" || band === "Healthy") return "bg-green-500";
-  if (band === "Moderate") return "bg-amber-500";
-  if (band === "Developing" || band === "Below Average") return "bg-orange-500";
+function barFill(band: string) {
+  if (["Good","Thriving","Healthy"].includes(band)) return "bg-emerald-500";
+  if (band === "Moderate") return "bg-amber-400";
+  if (["Developing","Below Average"].includes(band)) return "bg-orange-400";
   return "bg-red-500";
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Score gauge (overall big number + bar) ───────────────────────────────────
 
-function SubscaleRow({ sub, lang, deptAvg }: { sub: SubscaleAgg; lang: Lang; deptAvg?: SubscaleAgg }) {
-  const label = lang === "ar" ? (SUBSCALE_AR[sub.subscale] ?? sub.label) : sub.label;
+function ScoreGauge({ sub, lang }: { sub: SubscaleAgg; lang: Lang }) {
+  const bandLabel = lang === "ar" ? (BAND_AR[sub.band] ?? sub.band) : sub.band;
+  return (
+    <div className="flex flex-col items-center gap-3 py-2">
+      <div className="relative w-36 h-36 flex items-center justify-center">
+        {/* Ring */}
+        <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#f3f4f6" strokeWidth="10" />
+          <circle
+            cx="60" cy="60" r="50" fill="none"
+            stroke={["Good","Thriving","Healthy"].includes(sub.band) ? "#10b981"
+              : sub.band === "Moderate" ? "#f59e0b"
+              : ["Developing","Below Average"].includes(sub.band) ? "#f97316"
+              : "#ef4444"}
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeDasharray={`${2 * Math.PI * 50}`}
+            strokeDashoffset={`${2 * Math.PI * 50 * (1 - sub.avg / 100)}`}
+            className="transition-all duration-700"
+          />
+        </svg>
+        <div className="text-center">
+          <span className={`text-4xl font-black ${bandColor(sub.band)}`}>{sub.avg}</span>
+          <span className="block text-xs text-gray-400 font-medium">/100</span>
+        </div>
+      </div>
+      <span className={`px-3 py-1 rounded-full text-sm font-bold border ${bandBg(sub.band)}`}>
+        {bandLabel}
+      </span>
+    </div>
+  );
+}
+
+// ─── Horizontal bar row ───────────────────────────────────────────────────────
+
+function ScoreBar({
+  sub, orgSub, lang,
+}: {
+  sub: SubscaleAgg;
+  orgSub?: SubscaleAgg;  // company average shown as comparison line
+  lang: Lang;
+}) {
+  const label     = lang === "ar" ? (SUBSCALE_AR[sub.subscale] ?? sub.label) : sub.label;
   const bandLabel = lang === "ar" ? (BAND_AR[sub.band] ?? sub.band) : sub.band;
 
   return (
     <div className="py-3 border-b border-gray-50 last:border-0">
-      <div className="flex items-center justify-between gap-4 mb-1.5">
-        <span className="text-sm text-gray-700 font-medium flex-1 min-w-0 truncate">{label}</span>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <span className="text-sm font-medium text-gray-800 flex-1 min-w-0">{label}</span>
         <div className="flex items-center gap-2 shrink-0">
-          {deptAvg && (
+          {orgSub && (
             <span className="text-xs text-gray-400 hidden sm:inline">
-              {lang === "ar" ? "القسم:" : "Dept:"}{" "}
-              <span className={`font-semibold ${bandColor(deptAvg.band)}`}>{deptAvg.avg}</span>
+              {lang === "ar" ? "الشركة:" : "Co.:"}{" "}
+              <span className={`font-semibold ${bandColor(orgSub.band)}`}>{orgSub.avg}</span>
             </span>
           )}
-          <span className="text-sm font-bold text-gray-900 w-8 text-end">{sub.avg}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${bandBg(sub.band)}`}>
+          <span className={`text-base font-black ${bandColor(sub.band)}`}>{sub.avg}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${bandBg(sub.band)}`}>
             {bandLabel}
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+
+      {/* Dept bar + optional company marker */}
+      <div className="relative h-3 bg-gray-100 rounded-full overflow-visible">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barFill(sub.band)}`}
+          style={{ width: `${sub.avg}%` }}
+        />
+        {/* Company average tick line */}
+        {orgSub && (
           <div
-            className={`h-full rounded-full transition-all ${barColor(sub.band)}`}
-            style={{ width: `${sub.avg}%` }}
+            className="absolute top-0 h-full w-0.5 bg-gray-500/40 rounded"
+            style={{ left: `${orgSub.avg}%` }}
+            title={`Company: ${orgSub.avg}`}
           />
-        </div>
-        {deptAvg && (
-          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden sm:hidden">
-            <div
-              className={`h-full rounded-full ${barColor(deptAvg.band)} opacity-60`}
-              style={{ width: `${deptAvg.avg}%` }}
-            />
-          </div>
         )}
       </div>
+
+      {orgSub && (
+        <div className="mt-1 flex items-center gap-1 sm:hidden">
+          <div className="w-3 h-0.5 bg-gray-400 rounded" />
+          <span className="text-xs text-gray-400">
+            {lang === "ar" ? `الشركة: ${orgSub.avg}` : `Company avg: ${orgSub.avg}`}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -169,8 +220,9 @@ export default function ResultsPage() {
       ? data.assessmentNameAr
       : data?.assessmentName ?? "";
 
-  const orgSubscales = (data?.organisation?.subscales ?? []).filter((s) => s.subscale !== "total");
-  const orgTotal     = data?.organisation?.subscales.find((s) => s.subscale === "total");
+  const allOrgSubscales = data?.organisation?.subscales ?? [];
+  const orgTotal        = allOrgSubscales.find((s) => s.subscale === "total");
+  const orgSubscales    = allOrgSubscales.filter((s) => s.subscale !== "total");
 
   return (
     <div dir={dir(lang)} className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-amber-50/30">
@@ -197,7 +249,7 @@ export default function ResultsPage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 pb-20 space-y-6">
+      <main className="max-w-3xl mx-auto px-4 py-8 pb-24 space-y-5">
 
         {/* Loading */}
         {!data && !error && (
@@ -210,7 +262,7 @@ export default function ResultsPage() {
         {/* Error */}
         {error && (
           <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-10 text-center mt-10">
-            <div className="text-5xl mb-4">⚠️</div>
+            <div className="text-4xl mb-4">⚠️</div>
             <h1 className="text-xl font-bold text-gray-900 mb-2">
               {lang === "ar" ? "النتائج غير متاحة" : "Results unavailable"}
             </h1>
@@ -220,113 +272,137 @@ export default function ResultsPage() {
 
         {data && (
           <>
-            {/* Hero */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <p className="text-xs font-semibold text-brand-600 uppercase tracking-wider mb-1">
-                {lang === "ar" ? "نتائج التقييم" : "Assessment Results"}
-              </p>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">{data.cycleTitle}</h1>
-              <p className="text-sm text-gray-500 mb-4">{assessmentName} · {orgName}</p>
-
-              <div className="flex flex-wrap gap-4">
-                <div className="bg-gray-50 rounded-xl px-4 py-3 text-center min-w-[90px]">
-                  <p className="text-2xl font-black text-brand-600">{data.respondentCount}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {lang === "ar" ? "مشارك" : "Respondents"}
-                  </p>
-                </div>
-                {orgTotal && (
-                  <div className="bg-gray-50 rounded-xl px-4 py-3 text-center min-w-[90px]">
-                    <p className={`text-2xl font-black ${bandColor(orgTotal.band)}`}>{orgTotal.avg}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {lang === "ar" ? "الدرجة الإجمالية" : "Overall Score"}
-                    </p>
-                  </div>
-                )}
-                {orgTotal && (
-                  <div className={`rounded-xl px-4 py-3 text-center border min-w-[90px] ${bandBg(orgTotal.band)}`}>
-                    <p className="text-sm font-bold">
-                      {lang === "ar" ? (BAND_AR[orgTotal.band] ?? orgTotal.band) : orgTotal.band}
-                    </p>
-                    <p className="text-xs opacity-70 mt-0.5">
-                      {lang === "ar" ? "المستوى" : "Band"}
-                    </p>
-                  </div>
-                )}
+            {/* ── Hero card ─────────────────────────────────────────────── */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="bg-gradient-to-r from-brand-500 to-brand-600 px-6 py-5">
+                <p className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-1">
+                  {lang === "ar" ? "نتائج التقييم" : "Assessment Results"}
+                </p>
+                <h1 className="text-white text-xl font-bold leading-snug">{data.cycleTitle}</h1>
+                <p className="text-white/70 text-sm mt-0.5">{assessmentName} · {orgName}</p>
               </div>
 
-              {/* Privacy note */}
-              <div className="mt-4 flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-                <span className="text-blue-400 mt-0.5 text-sm">🔒</span>
-                <p className="text-xs text-blue-700 leading-relaxed">
-                  {lang === "ar"
-                    ? "جميع النتائج المعروضة هي متوسطات جماعية مجهولة الهوية. لا تُعرض أي بيانات فردية."
-                    : "All scores shown are anonymous group averages. No individual data is included."}
-                </p>
+              <div className="px-6 py-5">
+                <div className="flex flex-wrap items-center gap-6">
+                  {/* Respondent count */}
+                  <div className="text-center min-w-[72px]">
+                    <p className="text-3xl font-black text-brand-600">{data.respondentCount}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 font-medium">
+                      {lang === "ar" ? "مشارك" : "Respondents"}
+                    </p>
+                  </div>
+
+                  {/* Overall score gauge */}
+                  {orgTotal && (
+                    <div className="flex-1 min-w-[200px]">
+                      <ScoreGauge sub={orgTotal} lang={lang} />
+                    </div>
+                  )}
+
+                  {/* No scores yet */}
+                  {!orgTotal && (
+                    <p className="text-sm text-gray-400 flex-1">
+                      {lang === "ar" ? "لا توجد نتائج كافية بعد." : "No aggregated scores yet."}
+                    </p>
+                  )}
+                </div>
+
+                {/* Privacy note */}
+                <div className="mt-4 flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                  <span className="text-blue-400 mt-0.5 shrink-0">🔒</span>
+                  <p className="text-xs text-blue-700 leading-relaxed">
+                    {lang === "ar"
+                      ? "جميع النتائج المعروضة هي متوسطات جماعية مجهولة الهوية. لا تُعرض أي بيانات فردية."
+                      : "All scores are anonymous group averages. No individual responses are ever shown."}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Organisation scores */}
+            {/* ── Company subscale breakdown ─────────────────────────────── */}
             {orgSubscales.length > 0 && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                <h2 className="font-bold text-gray-900 mb-4">
+                <h2 className="font-bold text-gray-900 mb-1">
                   {lang === "ar" ? "نتائج المؤسسة" : "Company Results"}
                 </h2>
+                <p className="text-xs text-gray-400 mb-4">
+                  {lang === "ar" ? "المتوسطات حسب المحور — 0 إلى 100" : "Subscale averages — scored 0 to 100"}
+                </p>
                 {orgSubscales.map((sub) => (
-                  <SubscaleRow key={sub.subscale} sub={sub} lang={lang} />
+                  <ScoreBar key={sub.subscale} sub={sub} lang={lang} />
                 ))}
               </div>
             )}
 
-            {/* If only one subscale (PSS / WHO-5 — just "total") show it */}
+            {/* PSS / WHO-5: only "total" subscale — show it as a full bar */}
             {orgSubscales.length === 0 && orgTotal && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <h2 className="font-bold text-gray-900 mb-4">
                   {lang === "ar" ? "نتائج المؤسسة" : "Company Results"}
                 </h2>
-                <SubscaleRow sub={orgTotal} lang={lang} />
+                <ScoreBar sub={orgTotal} lang={lang} />
               </div>
             )}
 
-            {/* Department breakdown */}
+            {/* ── Department comparison ──────────────────────────────────── */}
             {data.departments.length > 0 && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <h2 className="font-bold text-gray-900 mb-1">
                   {lang === "ar" ? "مقارنة الأقسام" : "Department Comparison"}
                 </h2>
-                <p className="text-xs text-gray-400 mb-4">
+                <p className="text-xs text-gray-400 mb-5">
                   {lang === "ar"
-                    ? "تُعرض الأقسام التي لديها مشارك واحد أو أكثر فقط."
-                    : "Only departments with 1 or more respondents are shown."}
+                    ? "الخط الرأسي على كل شريط يمثّل متوسط الشركة"
+                    : "The vertical tick on each bar marks the company average"}
                 </p>
 
-                <div className="space-y-6">
+                <div className="space-y-5">
                   {data.departments.map((dept) => {
                     const deptTotal = dept.subscales.find((s) => s.subscale === "total");
                     const deptSubs  = dept.subscales.filter((s) => s.subscale !== "total");
-                    const displaySubs = deptSubs.length > 0 ? deptSubs : dept.subscales;
+                    const displaySubs = deptSubs.length > 0 ? deptSubs : (deptTotal ? [deptTotal] : []);
 
                     return (
-                      <div key={dept.departmentId} className="border border-gray-100 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-3 gap-3">
-                          <h3 className="font-semibold text-gray-800 truncate">{dept.departmentName}</h3>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs text-gray-400">
-                              {dept.respondentCount} {lang === "ar" ? "مشارك" : "respondents"}
+                      <div key={dept.departmentId} className="border border-gray-100 rounded-xl overflow-hidden">
+                        {/* Dept header */}
+                        <div className={`px-4 py-3 flex items-center justify-between gap-3 ${
+                          deptTotal ? bandBg(deptTotal.band).replace("text-", "").replace("bg-","bg-").split(" ")[0] + " bg-opacity-40" : "bg-gray-50"
+                        }`}>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h3 className="font-semibold text-gray-900 truncate">{dept.departmentName}</h3>
+                            <span className="text-xs text-gray-500 shrink-0">
+                              · {dept.respondentCount} {lang === "ar" ? "مشارك" : dept.respondentCount === 1 ? "respondent" : "respondents"}
                             </span>
-                            {deptTotal && (
-                              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${bandBg(deptTotal.band)}`}>
+                          </div>
+                          {deptTotal && (
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`text-xl font-black ${bandColor(deptTotal.band)}`}>
+                                {deptTotal.avg}
+                              </span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${bandBg(deptTotal.band)}`}>
                                 {lang === "ar" ? (BAND_AR[deptTotal.band] ?? deptTotal.band) : deptTotal.band}
                               </span>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
-                        {displaySubs.map((sub) => {
-                          const orgSub = (data.organisation?.subscales ?? []).find((s) => s.subscale === sub.subscale);
-                          return (
-                            <SubscaleRow key={sub.subscale} sub={sub} lang={lang} deptAvg={orgSub} />
-                          );
-                        })}
+
+                        {/* Subscale bars */}
+                        {displaySubs.length > 0 && (
+                          <div className="px-4 py-2">
+                            {displaySubs.map((sub) => {
+                              const orgSub = allOrgSubscales.find((s) => s.subscale === sub.subscale);
+                              return (
+                                <ScoreBar key={sub.subscale} sub={sub} orgSub={orgSub} lang={lang} />
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {displaySubs.length === 0 && (
+                          <p className="px-4 py-3 text-xs text-gray-400">
+                            {lang === "ar" ? "لا توجد بيانات كافية." : "Not enough data to display scores."}
+                          </p>
+                        )}
                       </div>
                     );
                   })}
@@ -334,12 +410,14 @@ export default function ResultsPage() {
               </div>
             )}
 
-            {/* No departments note */}
+            {/* No departments */}
             {data.departments.length === 0 && (
-              <div className="text-center text-sm text-gray-400 py-2">
-                {lang === "ar"
-                  ? "لا توجد أقسام تستوفي الحد الأدنى من المشاركين (1) لعرض نتائجها."
-                  : "No departments met the minimum respondent threshold (1) for display."}
+              <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-8 text-center">
+                <p className="text-sm text-gray-400">
+                  {lang === "ar"
+                    ? "لا توجد أقسام تستوفي الحد الأدنى من المشاركين لعرض نتائجها."
+                    : "No departments have enough respondents for breakdown display yet."}
+                </p>
               </div>
             )}
           </>
