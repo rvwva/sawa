@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { auditLog } from "../middleware/audit";
 import { AuditAction } from "@prisma/client";
 import { logger } from "../lib/logger";
+import { scoreLocal } from "../services/scoring-local";
 
 export const responsesRouter = Router();
 
@@ -145,15 +146,28 @@ responsesRouter.post(
       const scoringRoute = ASSESSMENT_ROUTE[assessmentType];
 
       let scoringResult: Record<string, any> = {};
+      const scoringEndpoint = `${SCORING_URL}/score/${scoringRoute}`;
       try {
+        logger.info("Scoring service call", { url: scoringEndpoint, assessmentType });
         const { data } = await axios.post(
-          `${SCORING_URL}/score/${scoringRoute}`,
+          scoringEndpoint,
           { responses },
           { headers: { "X-Scoring-Key": SCORING_KEY }, timeout: 10_000 }
         );
         scoringResult = data.result;
-      } catch (err) {
-        logger.error("Scoring service error", { err });
+        logger.info("Scoring service success", { assessmentType });
+      } catch (err: any) {
+        logger.error("Scoring service unreachable — using local scorer", {
+          url: scoringEndpoint,
+          code: err?.code,
+          status: err?.response?.status,
+          message: err?.message,
+        });
+      }
+
+      if (Object.keys(scoringResult).length === 0) {
+        scoringResult = scoreLocal(assessmentType, responses as Record<string, number>);
+        logger.info("Local scorer used", { assessmentType, keys: Object.keys(scoringResult) });
       }
 
       const scoreRows = buildScoreRows(respondent.id, scoringResult, assessmentType);
