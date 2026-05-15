@@ -21,6 +21,7 @@ import { AuditAction } from "@prisma/client";
 import {
   aggregateCycleScores,
   aggregateDepartmentScores,
+  aggregateDemographicScores,
   getResponseRate,
   getCycleTrend,
   buildCycleSummary,
@@ -251,6 +252,25 @@ resultsRouter.get(
           scores: r.scores,
         })),
       });
+    } catch (err) { next(err); }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/results/cycle/:cycleId/demographics
+// Scores grouped by isSaudiNational, tenureRange, seniorityLevel.
+// Segments with < MIN_DEPT_RESPONDENTS respondents are suppressed.
+// ─────────────────────────────────────────────────────────────────────────────
+resultsRouter.get(
+  "/cycle/:cycleId/demographics",
+  requireAuth,
+  requireRole("ADMIN", "EXECUTIVE"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cycle = await resolveCycle(req.params.cycleId, req, res);
+      if (!cycle) return;
+      const breakdown = await aggregateDemographicScores(cycle.id);
+      return res.json(breakdown);
     } catch (err) { next(err); }
   }
 );

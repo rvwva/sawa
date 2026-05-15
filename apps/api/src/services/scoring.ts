@@ -339,6 +339,277 @@ export async function getCycleTrend(
   }));
 }
 
+// ─── Demographic aggregation ─────────────────────────────────────────────────
+
+export interface DemographicSegmentResult {
+  value: string;
+  label: string;
+  respondentCount: number;
+  suppressed: boolean;     // true when < MIN_DEPT_RESPONDENTS — no subscale data
+  subscales: SubscaleAggregate[];
+}
+
+export interface DemographicDimensionResult {
+  dimension: string;
+  segments: DemographicSegmentResult[];
+}
+
+export interface DeptNationalityCrossTab {
+  departmentId: string;
+  departmentName: string;
+  segments: Array<{
+    value: "saudi" | "nonSaudi";
+    label: string;
+    respondentCount: number;
+    suppressed: boolean;
+    subscales: SubscaleAggregate[];
+  }>;
+}
+
+export interface DemographicBreakdown {
+  cycleId: string;
+  nationality: DemographicDimensionResult;
+  tenure: DemographicDimensionResult;
+  seniority: DemographicDimensionResult;
+  departmentNationalityCrossTab: DeptNationalityCrossTab[];
+  saudiCount: number;
+  nonSaudiCount: number;
+  unknownNationalityCount: number;
+  saudizationPct: number | null;   // % of answered respondents who are Saudi
+}
+
+/**
+ * Aggregate scores for a specific set of respondent IDs.
+ * Shares the same band/stddev logic as aggregateCycleScores but operates on
+ * an explicit list rather than a cycle-wide filter.
+ */
+async function aggregateScoresForIds(
+  cycleId: string,
+  respondentIds: string[]
+): Promise<CycleAggregate | null> {
+  if (respondentIds.length === 0) return null;
+
+  const grouped = await prisma.score.groupBy({
+    by: ["subscale"],
+    where: { respondentId: { in: respondentIds } },
+    _avg: { scaledScore: true },
+    _min: { scaledScore: true },
+    _max: { scaledScore: true },
+    _count: { id: true },
+    orderBy: { subscale: "asc" },
+  });
+
+  if (grouped.length === 0) return null;
+
+  const idList = Prisma.join(respondentIds);
+
+  const stddevRows = await prisma.$queryRaw<StddevRow[]>`
+    SELECT subscale,
+           ROUND(STDDEV(scaled_score)::numeric, 2)::text AS stddev
+    FROM   scores
+    WHERE  respondent_id IN (${idList})
+    GROUP  BY subscale
+  `;
+  const stddevMap: Record<string, number> = {};
+  for (const row of stddevRows) {
+    stddevMap[row.subscale] = row.stddev != null ? parseFloat(row.stddev) : 0;
+  }
+
+  const bandRows = await prisma.$queryRaw<BandRow[]>`
+    SELECT subscale, band, COUNT(*) AS cnt
+    FROM   scores
+    WHERE  respondent_id IN (${idList})
+    GROUP  BY subscale, band
+    ORDER  BY subscale, band
+  `;
+  const bandMap: Record<string, Record<string, number>> = {};
+  for (const row of bandRows) {
+    (bandMap[row.subscale] ??= {})[row.band] = Number(row.cnt);
+  }
+
+  const cycle = await prisma.assessmentCycle.findUnique({
+    where: { id: cycleId },
+    select: { assessment: { select: { type: true } } },
+  });
+
+  const subscales: SubscaleAggregate[] = grouped.map((g) => ({
+    subscale: g.subscale,
+    label: formatSubscaleLabel(g.subscale),
+    avg: round(g._avg.scaledScore, 1),
+    min: round(g._min.scaledScore, 1),
+    max: round(g._max.scaledScore, 1),
+    stddev: stddevMap[g.subscale] ?? 0,
+    count: g._count.id,
+    band: modalBand(bandMap[g.subscale] ?? {}),
+    bandDistribution: bandMap[g.subscale] ?? {},
+  }));
+
+  return {
+    cycleId,
+    respondentCount: respondentIds.length,
+    assessmentType: cycle?.assessment.type ?? "UNKNOWN",
+    subscales,
+  };
+}
+
+/**
+ * Aggregate scores grouped by anonymous demographic fields:
+ * isSaudiNational, tenureRange, seniorityLevel.
+ * Applies the same MIN_DEPT_RESPONDENTS suppression rule as departments.
+ */
+export async function aggregateDemographicScores(
+  cycleId: string
+): Promise<DemographicBreakdown> {
+  const respondents = await prisma.respondent.findMany({
+    where: { cycleId, submittedAt: { not: null } },
+    select: {
+      id: true,
+      isSaudiNational: true,
+      tenureRange:     true,
+      seniorityLevel:  true,
+      departmentId:    true,
+      department:      { select: { name: true } },
+    },
+  });
+
+  // ── Nationality ──────────────────────────────────────────────────────────
+  const saudiIds    = respondents.filter((r) => r.isSaudiNational === true).map((r) => r.id);
+  const nonSaudiIds = respondents.filter((r) => r.isSaudiNational === false).map((r) => r.id);
+  const unknownNationalityCount = respondents.filter((r) => r.isSaudiNational === null).length;
+
+  const [saudiAgg, nonSaudiAgg] = await Promise.all([
+    saudiIds.length    >= MIN_DEPT_RESPONDENTS ? aggregateScoresForIds(cycleId, saudiIds)    : null,
+    nonSaudiIds.length >= MIN_DEPT_RESPONDENTS ? aggregateScoresForIds(cycleId, nonSaudiIds) : null,
+  ]);
+
+  const nationality: DemographicDimensionResult = {
+    dimension: "nationality",
+    segments: [
+      {
+        value: "true",
+        label: "Saudi National",
+        respondentCount: saudiIds.length,
+        suppressed: saudiIds.length < MIN_DEPT_RESPONDENTS,
+        subscales: saudiAgg?.subscales ?? [],
+      },
+      {
+        value: "false",
+        label: "Non-Saudi",
+        respondentCount: nonSaudiIds.length,
+        suppressed: nonSaudiIds.length < MIN_DEPT_RESPONDENTS,
+        subscales: nonSaudiAgg?.subscales ?? [],
+      },
+    ],
+  };
+
+  // ── Tenure ───────────────────────────────────────────────────────────────
+  const tenureOrder  = ["UNDER_1Y", "ONE_TO_3Y", "THREE_TO_7Y", "OVER_7Y"] as const;
+  const tenureLabels: Record<string, string> = {
+    UNDER_1Y:    "< 1 Year",
+    ONE_TO_3Y:   "1–3 Years",
+    THREE_TO_7Y: "3–7 Years",
+    OVER_7Y:     "7+ Years",
+  };
+  const tenureGroups: Record<string, string[]> = Object.fromEntries(tenureOrder.map((k) => [k, []]));
+  for (const r of respondents) {
+    if (r.tenureRange && r.tenureRange in tenureGroups) tenureGroups[r.tenureRange].push(r.id);
+  }
+
+  const tenureSegments = await Promise.all(
+    tenureOrder.map(async (value) => {
+      const ids = tenureGroups[value];
+      const agg = ids.length >= MIN_DEPT_RESPONDENTS ? await aggregateScoresForIds(cycleId, ids) : null;
+      return {
+        value,
+        label: tenureLabels[value],
+        respondentCount: ids.length,
+        suppressed: ids.length < MIN_DEPT_RESPONDENTS,
+        subscales: agg?.subscales ?? [],
+      };
+    })
+  );
+
+  // ── Seniority ────────────────────────────────────────────────────────────
+  const seniorityOrder  = ["INDIVIDUAL_CONTRIBUTOR", "MANAGER"] as const;
+  const seniorityLabels: Record<string, string> = {
+    INDIVIDUAL_CONTRIBUTOR: "Individual Contributor",
+    MANAGER:                "Manager / Team Lead",
+  };
+  const seniorityGroups: Record<string, string[]> = Object.fromEntries(seniorityOrder.map((k) => [k, []]));
+  for (const r of respondents) {
+    if (r.seniorityLevel && r.seniorityLevel in seniorityGroups) seniorityGroups[r.seniorityLevel].push(r.id);
+  }
+
+  const senioritySegments = await Promise.all(
+    seniorityOrder.map(async (value) => {
+      const ids = seniorityGroups[value];
+      const agg = ids.length >= MIN_DEPT_RESPONDENTS ? await aggregateScoresForIds(cycleId, ids) : null;
+      return {
+        value,
+        label: seniorityLabels[value],
+        respondentCount: ids.length,
+        suppressed: ids.length < MIN_DEPT_RESPONDENTS,
+        subscales: agg?.subscales ?? [],
+      };
+    })
+  );
+
+  // ── Department × Nationality cross-tab ───────────────────────────────────
+  const deptMap = new Map<string, { name: string; saudiIds: string[]; nonSaudiIds: string[] }>();
+  for (const r of respondents) {
+    if (!r.departmentId || r.isSaudiNational === null) continue;
+    if (!deptMap.has(r.departmentId)) {
+      deptMap.set(r.departmentId, { name: r.department?.name ?? "Unknown", saudiIds: [], nonSaudiIds: [] });
+    }
+    const entry = deptMap.get(r.departmentId)!;
+    if (r.isSaudiNational) entry.saudiIds.push(r.id);
+    else                   entry.nonSaudiIds.push(r.id);
+  }
+
+  const departmentNationalityCrossTab: DeptNationalityCrossTab[] = await Promise.all(
+    Array.from(deptMap.entries()).map(async ([deptId, { name, saudiIds: dS, nonSaudiIds: dN }]) => {
+      const [dSaudiAgg, dNonSaudiAgg] = await Promise.all([
+        dS.length >= MIN_DEPT_RESPONDENTS ? aggregateScoresForIds(cycleId, dS) : null,
+        dN.length >= MIN_DEPT_RESPONDENTS ? aggregateScoresForIds(cycleId, dN) : null,
+      ]);
+      return {
+        departmentId: deptId,
+        departmentName: name,
+        segments: [
+          {
+            value: "saudi"    as const,
+            label: "Saudi National",
+            respondentCount: dS.length,
+            suppressed: dS.length < MIN_DEPT_RESPONDENTS,
+            subscales: dSaudiAgg?.subscales ?? [],
+          },
+          {
+            value: "nonSaudi" as const,
+            label: "Non-Saudi",
+            respondentCount: dN.length,
+            suppressed: dN.length < MIN_DEPT_RESPONDENTS,
+            subscales: dNonSaudiAgg?.subscales ?? [],
+          },
+        ],
+      };
+    })
+  );
+
+  const answeredCount = saudiIds.length + nonSaudiIds.length;
+
+  return {
+    cycleId,
+    nationality,
+    tenure:   { dimension: "tenure",   segments: tenureSegments   },
+    seniority:{ dimension: "seniority",segments: senioritySegments },
+    departmentNationalityCrossTab,
+    saudiCount: saudiIds.length,
+    nonSaudiCount: nonSaudiIds.length,
+    unknownNationalityCount,
+    saudizationPct: answeredCount > 0 ? round((saudiIds.length / answeredCount) * 100, 1) : null,
+  };
+}
+
 // ─── Snapshot summary (cached into reports.summary_data) ─────────────────────
 
 export async function buildCycleSummary(cycleId: string) {

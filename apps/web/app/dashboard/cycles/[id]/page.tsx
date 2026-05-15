@@ -65,6 +65,43 @@ type ResponseRate = {
 type TrendPoint = { cycleId: string; cycleTitle: string; endsAt: string; respondentCount: number; avgTotal: number | null };
 type TrendData  = { assessmentType: string; assessmentName: string; dataPoints: TrendPoint[] };
 
+type DemographicSegment = {
+  value: string;
+  label: string;
+  respondentCount: number;
+  suppressed: boolean;
+  subscales: SubscaleAgg[];
+};
+
+type DemographicDimension = {
+  dimension: string;
+  segments: DemographicSegment[];
+};
+
+type DeptNationalityCrossTab = {
+  departmentId: string;
+  departmentName: string;
+  segments: Array<{
+    value: "saudi" | "nonSaudi";
+    label: string;
+    respondentCount: number;
+    suppressed: boolean;
+    subscales: SubscaleAgg[];
+  }>;
+};
+
+type DemographicData = {
+  cycleId: string;
+  nationality: DemographicDimension;
+  tenure: DemographicDimension;
+  seniority: DemographicDimension;
+  departmentNationalityCrossTab: DeptNationalityCrossTab[];
+  saudiCount: number;
+  nonSaudiCount: number;
+  unknownNationalityCount: number;
+  saudizationPct: number | null;
+};
+
 // ─── Label maps ───────────────────────────────────────────────────────────────
 
 const subscaleAr: Record<string, string> = {
@@ -183,12 +220,13 @@ export default function CycleDetailPage() {
   const lang   = useDashLang();
   const t      = useTranslations(lang);
 
-  const [cycleResult, setCycleResult] = useState<CycleResult | null>(null);
-  const [deptData,    setDeptData]    = useState<DeptResponse | null>(null);
-  const [rateData,    setRateData]    = useState<ResponseRate | null>(null);
-  const [trendData,   setTrendData]   = useState<TrendData | null>(null);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState("");
+  const [cycleResult,    setCycleResult]    = useState<CycleResult | null>(null);
+  const [deptData,       setDeptData]       = useState<DeptResponse | null>(null);
+  const [rateData,       setRateData]       = useState<ResponseRate | null>(null);
+  const [trendData,      setTrendData]      = useState<TrendData | null>(null);
+  const [demographicData,setDemographicData]= useState<DemographicData | null>(null);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("mindlign_token");
@@ -204,12 +242,14 @@ export default function CycleDetailPage() {
       fetch(`${base}/departments`, { headers }).then((r) => r.ok ? r.json() : null),
       fetch(`${base}/response-rate`, { headers }).then((r) => r.ok ? r.json() : null),
       fetch(`${base}/trend`, { headers }).then((r) => r.ok ? r.json() : null),
+      fetch(`${base}/demographics`, { headers }).then((r) => r.ok ? r.json() : null),
     ])
-      .then(([cr, dd, rd, td]) => {
+      .then(([cr, dd, rd, td, dem]) => {
         setCycleResult(cr);
-        if (dd) setDeptData(dd);
-        if (rd) setRateData(rd);
-        if (td) setTrendData(td);
+        if (dd)  setDeptData(dd);
+        if (rd)  setRateData(rd);
+        if (td)  setTrendData(td);
+        if (dem) setDemographicData(dem);
       })
       .catch(() => setError(lang === "ar" ? "تعذّر تحميل بيانات الدورة." : "Failed to load cycle data."))
       .finally(() => setLoading(false));
@@ -632,6 +672,401 @@ export default function CycleDetailPage() {
         </section>
       )}
 
+      {/* ── E) Demographic Split ── */}
+      {demographicData && (
+        <DemographicSection data={demographicData} lang={lang} />
+      )}
+
+    </div>
+  );
+}
+
+// ─── Band distribution bar ────────────────────────────────────────────────────
+
+// ─── Demographic Split section ────────────────────────────────────────────────
+
+type DemogTab = "nationality" | "tenure" | "seniority";
+
+function DemographicSection({ data, lang }: { data: DemographicData; lang: "en" | "ar" }) {
+  const t = useTranslations(lang);
+  const [activeTab, setActiveTab] = useState<DemogTab>("nationality");
+
+  const tabs: { id: DemogTab; label: string }[] = [
+    { id: "nationality", label: t("demog_nationality_tab") },
+    { id: "tenure",      label: t("demog_tenure_tab")      },
+    { id: "seniority",   label: t("demog_seniority_tab")   },
+  ];
+
+  // Nationality KPI helpers
+  const saudiSeg    = data.nationality.segments.find((s) => s.value === "true");
+  const nonSaudiSeg = data.nationality.segments.find((s) => s.value === "false");
+  const saudiTotal    = saudiSeg?.subscales.find((s) => s.subscale === "total");
+  const nonSaudiTotal = nonSaudiSeg?.subscales.find((s) => s.subscale === "total");
+  const gap = saudiTotal && nonSaudiTotal ? Math.round(saudiTotal.avg - nonSaudiTotal.avg) : null;
+
+  // Equity alerts: any department where |saudi_total – nonSaudi_total| ≥ 15
+  const alerts = data.departmentNationalityCrossTab.flatMap((dept) => {
+    const dS  = dept.segments.find((s) => s.value === "saudi");
+    const dNS = dept.segments.find((s) => s.value === "nonSaudi");
+    if (!dS || !dNS || dS.suppressed || dNS.suppressed) return [];
+    const st  = dS.subscales.find((s) => s.subscale === "total")?.avg;
+    const nst = dNS.subscales.find((s) => s.subscale === "total")?.avg;
+    if (st == null || nst == null) return [];
+    const diff = Math.round(st - nst);
+    if (Math.abs(diff) < 15) return [];
+    return [{ dept: dept.departmentName, diff }];
+  });
+
+  // Check if there's any demographic data at all
+  const hasNationalityData = (saudiSeg?.respondentCount ?? 0) + (nonSaudiSeg?.respondentCount ?? 0) > 0;
+  const hasTenureData = data.tenure.segments.some((s) => s.respondentCount > 0);
+  const hasSeniorityData = data.seniority.segments.some((s) => s.respondentCount > 0);
+  if (!hasNationalityData && !hasTenureData && !hasSeniorityData) {
+    return (
+      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-800">{t("demog_tab")}</h2>
+        </div>
+        <div className="p-12 text-center text-gray-400 text-sm">{t("demog_no_data")}</div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-gray-100">
+        <h2 className="font-semibold text-gray-800">{t("demog_tab")}</h2>
+        <p className="text-xs text-gray-400 mt-0.5">{t("demog_subtitle")}</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="px-6 pt-4 flex gap-2 border-b border-gray-100 pb-0 overflow-x-auto">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={[
+              "px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors whitespace-nowrap",
+              activeTab === tab.id
+                ? "border-brand-500 text-brand-700 bg-brand-50/50"
+                : "border-transparent text-gray-500 hover:text-gray-700",
+            ].join(" ")}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="p-6 space-y-6">
+
+        {/* ── Nationality tab ── */}
+        {activeTab === "nationality" && (
+          <>
+            {/* 4 KPI cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <DemogKpiCard
+                label={t("demog_kpi_saudi_score")}
+                value={saudiSeg?.suppressed ? null : (saudiTotal ? Math.round(saudiTotal.avg) : null)}
+                band={saudiTotal?.band}
+                note={saudiSeg ? `${saudiSeg.respondentCount} respondents` : undefined}
+                suffix="/100"
+              />
+              <DemogKpiCard
+                label={t("demog_kpi_nonsaudi_score")}
+                value={nonSaudiSeg?.suppressed ? null : (nonSaudiTotal ? Math.round(nonSaudiTotal.avg) : null)}
+                band={nonSaudiTotal?.band}
+                note={nonSaudiSeg ? `${nonSaudiSeg.respondentCount} respondents` : undefined}
+                suffix="/100"
+              />
+              <DemogKpiCard
+                label={t("demog_kpi_gap")}
+                value={gap}
+                note={t("demog_kpi_gap_note")}
+                isGap
+              />
+              <DemogKpiCard
+                label={t("demog_kpi_saudization")}
+                value={data.saudizationPct !== null ? Math.round(data.saudizationPct) : null}
+                note={t("demog_kpi_saudization_note")}
+                suffix="%"
+              />
+            </div>
+
+            {/* Equity alerts */}
+            {alerts.length > 0 && (
+              <div className="space-y-2">
+                {alerts.map(({ dept, diff }) => (
+                  <div
+                    key={dept}
+                    className={[
+                      "flex items-start gap-3 rounded-xl px-4 py-3 border text-sm",
+                      diff < 0
+                        ? "bg-red-50 border-red-200"
+                        : "bg-amber-50 border-amber-200",
+                    ].join(" ")}
+                  >
+                    <span className="text-lg shrink-0 mt-0.5">{diff < 0 ? "⚠️" : "ℹ️"}</span>
+                    <div>
+                      <span className={`font-semibold ${diff < 0 ? "text-red-700" : "text-amber-700"}`}>
+                        {t("demog_flag_title")}:
+                      </span>{" "}
+                      <span className={diff < 0 ? "text-red-600" : "text-amber-600"}>
+                        {diff < 0
+                          ? `${t("demog_flag_lower_pre")} ${Math.abs(diff)} ${t("demog_flag_lower_post")} ${dept}`
+                          : `${t("demog_flag_higher_pre")} ${Math.abs(diff)} ${t("demog_flag_higher_post")} ${dept}`
+                        }
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Organisation-level Saudi vs Non-Saudi */}
+            <div>
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">
+                {t("demog_org_level")}
+              </p>
+              <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 space-y-3">
+                {[saudiSeg, nonSaudiSeg].map((seg, i) => {
+                  if (!seg) return null;
+                  const total = seg.subscales.find((s) => s.subscale === "total");
+                  const color = i === 0 ? "#2563eb" : "#7c3aed";
+                  return (
+                    <SegmentBar
+                      key={seg.value}
+                      label={i === 0 ? t("demog_saudi") : t("demog_nonsaudi")}
+                      count={seg.respondentCount}
+                      suppressed={seg.suppressed}
+                      avg={total?.avg}
+                      band={total?.band}
+                      color={color}
+                      lang={lang}
+                      t={t}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Department cross-tab */}
+            {data.departmentNationalityCrossTab.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">
+                  {t("demog_dept_level")}
+                </p>
+                <div className="space-y-4">
+                  {data.departmentNationalityCrossTab.map((dept) => {
+                    const dS  = dept.segments.find((s) => s.value === "saudi");
+                    const dNS = dept.segments.find((s) => s.value === "nonSaudi");
+                    const dSTotal  = dS?.subscales.find((s) => s.subscale === "total");
+                    const dNSTotal = dNS?.subscales.find((s) => s.subscale === "total");
+                    const dGap = dSTotal && dNSTotal && !dS?.suppressed && !dNS?.suppressed
+                      ? Math.round(dSTotal.avg - dNSTotal.avg)
+                      : null;
+                    const hasAlert = dGap !== null && Math.abs(dGap) >= 15;
+
+                    return (
+                      <div
+                        key={dept.departmentId}
+                        className={`border rounded-xl overflow-hidden ${hasAlert ? "border-red-200" : "border-gray-100"}`}
+                      >
+                        <div className={`px-4 py-2.5 flex items-center justify-between gap-3 ${hasAlert ? "bg-red-50" : "bg-gray-50"}`}>
+                          <h4 className="font-semibold text-gray-900 text-sm">{dept.departmentName}</h4>
+                          {dGap !== null && (
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                              hasAlert
+                                ? (dGap < 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")
+                                : "bg-gray-200 text-gray-600"
+                            }`}>
+                              {dGap > 0 ? "+" : ""}{dGap} pts
+                            </span>
+                          )}
+                        </div>
+                        <div className="px-4 py-3 space-y-2.5">
+                          {[
+                            { seg: dS,  color: "#2563eb", label: t("demog_saudi"),    total: dSTotal  },
+                            { seg: dNS, color: "#7c3aed", label: t("demog_nonsaudi"), total: dNSTotal },
+                          ].map(({ seg, color, label, total }) => {
+                            if (!seg) return null;
+                            return (
+                              <SegmentBar
+                                key={label}
+                                label={label}
+                                count={seg.respondentCount}
+                                suppressed={seg.suppressed}
+                                avg={total?.avg}
+                                band={total?.band}
+                                color={color}
+                                lang={lang}
+                                t={t}
+                              />
+                            );
+                          })}
+                          {/* Per-subscale dual rows (if both segments have data) */}
+                          {dS && !dS.suppressed && dNS && !dNS.suppressed && (() => {
+                            const subs = dS.subscales.filter((s) => s.subscale !== "total");
+                            if (subs.length === 0) return null;
+                            return (
+                              <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+                                {subs.map((sub) => {
+                                  const nsSub = dNS.subscales.find((s) => s.subscale === sub.subscale);
+                                  if (!nsSub) return null;
+                                  return (
+                                    <div key={sub.subscale}>
+                                      <p className="text-xs text-gray-500 mb-1">
+                                        {subLabel(sub, lang)}
+                                      </p>
+                                      <div className="space-y-1">
+                                        <MiniSegBar avg={sub.avg}    band={sub.band}    color="#2563eb" />
+                                        <MiniSegBar avg={nsSub.avg}  band={nsSub.band}  color="#7c3aed" />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Tenure / Seniority tabs — generic segment bars ── */}
+        {(activeTab === "tenure" || activeTab === "seniority") && (() => {
+          const dim = activeTab === "tenure" ? data.tenure : data.seniority;
+          const colors = ["#d97706","#2563eb","#7c3aed","#16a34a","#dc2626"];
+          return (
+            <div className="space-y-3">
+              {dim.segments.map((seg, i) => {
+                const total = seg.subscales.find((s) => s.subscale === "total");
+                return (
+                  <SegmentBar
+                    key={seg.value}
+                    label={seg.label}
+                    count={seg.respondentCount}
+                    suppressed={seg.suppressed}
+                    avg={total?.avg}
+                    band={total?.band}
+                    color={colors[i % colors.length]}
+                    lang={lang}
+                    t={t}
+                  />
+                );
+              })}
+            </div>
+          );
+        })()}
+
+      </div>
+    </section>
+  );
+}
+
+// ─── Demographic KPI card ─────────────────────────────────────────────────────
+
+function DemogKpiCard({
+  label, value, band, note, suffix, isGap,
+}: {
+  label: string;
+  value: number | null;
+  band?: string;
+  note?: string;
+  suffix?: string;
+  isGap?: boolean;
+}) {
+  const gapColor = isGap && value !== null
+    ? (value > 0 ? "text-green-600" : value < 0 ? "text-red-600" : "text-gray-700")
+    : (band ? bandColor(band) : "text-gray-700");
+
+  return (
+    <div className="bg-gray-50 rounded-xl border border-gray-100 p-4">
+      <p className="text-xs text-gray-500 font-medium leading-tight mb-2">{label}</p>
+      {value !== null ? (
+        <>
+          <p className={`text-2xl font-black ${gapColor}`}>
+            {isGap && value > 0 ? "+" : ""}{value}{suffix ?? ""}
+          </p>
+          {note && <p className="text-xs text-gray-400 mt-0.5">{note}</p>}
+        </>
+      ) : (
+        <p className="text-sm text-gray-400 italic">—</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Segment bar (single group row) ──────────────────────────────────────────
+
+function SegmentBar({
+  label, count, suppressed, avg, band, color, lang, t,
+}: {
+  label: string;
+  count: number;
+  suppressed: boolean;
+  avg?: number;
+  band?: string;
+  color: string;
+  lang: "en" | "ar";
+  t: (k: any) => string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
+          <span className="text-sm font-medium text-gray-700 truncate">{label}</span>
+          <span className="text-xs text-gray-400 shrink-0">({count})</span>
+        </div>
+        {suppressed ? (
+          <span className="text-xs text-gray-400 italic shrink-0">{t("demog_insufficient")}</span>
+        ) : avg !== null && avg !== undefined ? (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={`text-sm font-bold ${band ? bandColor(band) : "text-gray-700"}`}>
+              {Math.round(avg)}
+            </span>
+            {band && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full border font-semibold hidden sm:inline ${bandBg(band)}`}>
+                {translateBand(band, lang)}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="text-xs text-gray-400 italic shrink-0">—</span>
+        )}
+      </div>
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        {suppressed ? (
+          <div className="h-full w-full bg-gray-200 rounded-full opacity-40" />
+        ) : avg !== null && avg !== undefined ? (
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${Math.round(avg)}%`, backgroundColor: color }}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ─── Mini segment bar (compact, for subscale dual rows) ───────────────────────
+
+function MiniSegBar({ avg, band: _band, color }: { avg: number; band: string; color: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${Math.round(avg)}%`, backgroundColor: color }}
+        />
+      </div>
+      <span className="text-xs font-semibold text-gray-600 w-6 text-end">{Math.round(avg)}</span>
     </div>
   );
 }

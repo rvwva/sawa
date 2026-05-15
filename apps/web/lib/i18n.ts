@@ -135,6 +135,35 @@ const ui = {
     guidance_culture_developing:    "Progress is visible, but meaningful gaps remain.",
     guidance_culture_needs_attn:    "This area needs focused attention and investment.",
 
+    // ── Demographic split (dashboard) ────────────────────
+    demog_tab:             "Demographic Split",
+    demog_subtitle:        "Anonymous demographic breakdowns",
+    demog_nationality_tab: "Nationality",
+    demog_tenure_tab:      "Tenure",
+    demog_seniority_tab:   "Seniority",
+
+    demog_kpi_saudi_score:      "Saudi Score",
+    demog_kpi_nonsaudi_score:   "Non-Saudi Score",
+    demog_kpi_gap:              "Engagement Gap",
+    demog_kpi_gap_note:         "Saudi vs Non-Saudi",
+    demog_kpi_saudization:      "Saudization Rate",
+    demog_kpi_saudization_note: "of respondents",
+
+    demog_insufficient:      "Insufficient data",
+    demog_insufficient_note: "< 5 respondents in this segment",
+
+    demog_flag_title:        "Equity Alert",
+    demog_flag_lower_pre:    "Saudi nationals score",
+    demog_flag_lower_post:   "pts lower than non-Saudi peers in",
+    demog_flag_higher_pre:   "Saudi nationals score",
+    demog_flag_higher_post:  "pts higher than non-Saudi peers in",
+
+    demog_saudi:             "Saudi National",
+    demog_nonsaudi:          "Non-Saudi",
+    demog_org_level:         "Organisation-Level",
+    demog_dept_level:        "By Department",
+    demog_no_data:           "No demographic data collected yet for this cycle.",
+
     // ── Print / PDF ───────────────────────────────────────
     print_title:  "My Mindlign Assessment Results",
     print_date:   "Assessment date",
@@ -417,6 +446,35 @@ const ui = {
     guidance_culture_healthy:       "أسس متينة هنا. واصل البناء على هذه النقاط القوية.",
     guidance_culture_developing:    "يظهر تقدم ملموس، لكن ثمة فجوات جوهرية لا تزال قائمة.",
     guidance_culture_needs_attn:    "هذا المجال يحتاج إلى اهتمام واستثمار مركّز.",
+
+    // ── Demographic split (dashboard) ────────────────────
+    demog_tab:             "التوزيع الديموغرافي",
+    demog_subtitle:        "تفصيل ديموغرافي مجهول الهوية",
+    demog_nationality_tab: "الجنسية",
+    demog_tenure_tab:      "مدة الخدمة",
+    demog_seniority_tab:   "المستوى الوظيفي",
+
+    demog_kpi_saudi_score:      "درجة السعوديين",
+    demog_kpi_nonsaudi_score:   "درجة غير السعوديين",
+    demog_kpi_gap:              "فجوة المشاركة",
+    demog_kpi_gap_note:         "سعودي مقابل غير سعودي",
+    demog_kpi_saudization:      "نسبة السعودة",
+    demog_kpi_saudization_note: "من المشاركين",
+
+    demog_insufficient:      "بيانات غير كافية",
+    demog_insufficient_note: "أقل من 5 مشاركين في هذه الشريحة",
+
+    demog_flag_title:        "تنبيه عدالة",
+    demog_flag_lower_pre:    "المواطنون السعوديون يسجّلون",
+    demog_flag_lower_post:   "نقطة أقل من نظرائهم غير السعوديين في",
+    demog_flag_higher_pre:   "المواطنون السعوديون يسجّلون",
+    demog_flag_higher_post:  "نقطة أعلى من نظرائهم غير السعوديين في",
+
+    demog_saudi:             "مواطن سعودي",
+    demog_nonsaudi:          "غير سعودي",
+    demog_org_level:         "على مستوى المنظمة",
+    demog_dept_level:        "حسب القسم",
+    demog_no_data:           "لم يتم جمع بيانات ديموغرافية لهذه الدورة بعد.",
 
     // ── Print / PDF ───────────────────────────────────────
     print_title:  "نتائج تقييم Mindlign",
