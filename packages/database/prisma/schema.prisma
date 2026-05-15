@@ -57,6 +57,18 @@ enum AuditAction {
   ROLE_CHANGED
 }
 
+enum TenureRange {
+  UNDER_1Y
+  ONE_TO_3Y
+  THREE_TO_7Y
+  OVER_7Y
+}
+
+enum SeniorityLevel {
+  INDIVIDUAL_CONTRIBUTOR
+  MANAGER
+}
+
 // ─── Organisations ──────────────────────────────────────────────────────────
 
 model Organisation {
@@ -194,12 +206,15 @@ model Respondent {
   departmentId   String?   @map("department_id")
   // Pseudonymous token — never linked to PII
   sessionToken   String    @unique @default(cuid()) @map("session_token")
-  consentGiven   Boolean   @default(false) @map("consent_given")
-  consentAt      DateTime? @map("consent_at")
-  consentIp      String?   @map("consent_ip")
-  consentVersion String?   @map("consent_version")
-  submittedAt    DateTime? @map("submitted_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
+  consentGiven     Boolean        @default(false) @map("consent_given")
+  consentAt        DateTime?      @map("consent_at")
+  consentIp        String?        @map("consent_ip")
+  consentVersion   String?        @map("consent_version")
+  isSaudiNational  Boolean?       @map("is_saudi_national")
+  tenureRange      TenureRange?   @map("tenure_range")
+  seniorityLevel   SeniorityLevel? @map("seniority_level")
+  submittedAt      DateTime?      @map("submitted_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
 
   cycle       AssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
   department  Department?     @relation(fields: [departmentId], references: [id])

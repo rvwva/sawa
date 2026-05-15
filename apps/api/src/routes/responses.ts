@@ -43,7 +43,8 @@ responsesRouter.post(
     }
 
     try {
-      const { cycleToken, departmentId, departmentLinkToken, consentVersion, responses } = req.body;
+      const { cycleToken, departmentId, departmentLinkToken, consentVersion, responses,
+              isSaudiNational, tenureRange, seniorityLevel } = req.body;
 
       logger.info("submit: received", {
         cycleToken,
@@ -129,6 +130,9 @@ responsesRouter.post(
           consentAt: new Date(),
           consentIp: clientIp,
           consentVersion: consentVersion ?? "1.0",
+          isSaudiNational: isSaudiNational ?? null,
+          tenureRange:     tenureRange     ?? null,
+          seniorityLevel:  seniorityLevel  ?? null,
           submittedAt: new Date(),
         },
       });

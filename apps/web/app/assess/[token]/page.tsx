@@ -6,6 +6,7 @@ import type { Lang } from "@/lib/i18n";
 import { useTranslations, dir } from "@/lib/i18n";
 import LanguageToggle from "@/components/ui/LanguageToggle";
 import ConsentScreen from "./ConsentScreen";
+import DemographicScreen, { type DemographicAnswers } from "./DemographicScreen";
 import DepartmentSelector from "./DepartmentSelector";
 import AssessmentForm from "./AssessmentForm";
 import ResultsScreen from "./ResultsScreen";
@@ -37,9 +38,9 @@ export type SubmissionResult = {
   scores: Record<string, any>;
 };
 
-type Stage = "loading" | "error" | "consent" | "department" | "form" | "results";
+type Stage = "loading" | "error" | "consent" | "demographic" | "department" | "form" | "results";
 
-const STEPS = ["consent", "department", "form", "results"] as const;
+const STEPS = ["consent", "demographic", "department", "form", "results"] as const;
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
@@ -59,9 +60,9 @@ function StepIndicator({
     t("step_results"),
   ];
   const stageIndex =
-    stage === "consent"    ? 0
-    : stage === "department" || stage === "form" ? 1
-    : stage === "results"  ? 2
+    stage === "consent"     ? 0
+    : stage === "demographic" || stage === "department" || stage === "form" ? 1
+    : stage === "results"   ? 2
     : -1;
 
   if (stageIndex < 0) return null;
@@ -113,7 +114,8 @@ export default function AssessmentPage() {
   const [lang, setLang] = useState<Lang>("en");
   const [stage, setStage] = useState<Stage>("loading");
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
-  const [selectedDeptId, setSelectedDeptId] = useState<string | undefined>();
+  const [selectedDeptId, setSelectedDeptId]           = useState<string | undefined>();
+  const [demographicAnswers, setDemographicAnswers]   = useState<DemographicAnswers>({});
 
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -141,6 +143,11 @@ export default function AssessmentPage() {
   const hasDepts = (cycleInfo?.departments?.length ?? 0) > 0;
 
   function handleConsentAccepted() {
+    setStage("demographic");
+  }
+
+  function handleDemographicComplete(answers: DemographicAnswers) {
+    setDemographicAnswers(answers);
     // Skip the department selector if the URL was already a department-specific link
     setStage(hasDepts && !cycleInfo?.departmentLinkToken ? "department" : "form");
   }
@@ -189,7 +196,7 @@ export default function AssessmentPage() {
       {/* ── Main content ───────────────────────────────────── */}
       <main className="max-w-2xl mx-auto px-4 py-8 pb-20">
         {/* Step indicator */}
-        {(stage === "consent" || stage === "department" || stage === "form" || stage === "results") && (
+        {(stage === "consent" || stage === "demographic" || stage === "department" || stage === "form" || stage === "results") && (
           <StepIndicator stage={stage} lang={lang} hasDepts={hasDepts} />
         )}
 
@@ -219,6 +226,11 @@ export default function AssessmentPage() {
           />
         )}
 
+        {/* Demographic */}
+        {stage === "demographic" && (
+          <DemographicScreen lang={lang} onComplete={handleDemographicComplete} />
+        )}
+
         {/* Department */}
         {stage === "department" && cycleInfo && (
           <DepartmentSelector
@@ -236,6 +248,7 @@ export default function AssessmentPage() {
             cycleInfo={cycleInfo}
             departmentId={selectedDeptId}
             departmentLinkToken={cycleInfo.departmentLinkToken}
+            demographicAnswers={demographicAnswers}
             onComplete={handleFormComplete}
           />
         )}

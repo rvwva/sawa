@@ -6,6 +6,7 @@ import type { Lang } from "@/lib/i18n";
 import { useTranslations } from "@/lib/i18n";
 import { makeBilingualSchema } from "@/lib/survey-translations";
 import type { CycleInfo, SubmissionResult } from "./page";
+import type { DemographicAnswers } from "./DemographicScreen";
 
 const DEFINITIONS: Record<string, { en: string; ar: string; source: string }> = {
   CBI: {
@@ -39,6 +40,7 @@ type Props = {
   cycleInfo: CycleInfo;
   departmentId?: string;
   departmentLinkToken?: string;
+  demographicAnswers?: DemographicAnswers;
   onComplete: (result: SubmissionResult) => void;
 };
 
@@ -48,6 +50,7 @@ export default function AssessmentForm({
   cycleInfo,
   departmentId,
   departmentLinkToken,
+  demographicAnswers,
   onComplete,
 }: Props) {
   const t = useTranslations(lang);
@@ -94,6 +97,9 @@ export default function AssessmentForm({
           responses: data,
           consentGiven: "true",
           consentVersion: "1.0",
+          isSaudiNational:  demographicAnswers?.isSaudiNational ?? null,
+          tenureRange:      demographicAnswers?.tenureRange ?? null,
+          seniorityLevel:   demographicAnswers?.seniorityLevel ?? null,
         }),
       });
       if (!res.ok) {

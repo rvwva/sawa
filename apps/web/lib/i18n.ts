@@ -55,6 +55,29 @@ const ui = {
     consent_cta:           "I Agree — Begin Assessment",
     consent_must_agree:    "Please check the box above to give your consent before proceeding.",
 
+    // ── Demographic screen ────────────────────────────────
+    demog_title:      "A few optional questions",
+    demog_subtitle:   "These anonymous details help us provide more meaningful insights. All questions are optional — skip any you prefer not to answer.",
+    demog_skip_all:   "Skip all",
+    demog_cta:        "Continue",
+
+    demog_q1_label:   "Are you a Saudi national?",
+    demog_q1_yes:     "Yes",
+    demog_q1_no:      "No",
+    demog_q1_skip:    "Prefer not to say",
+
+    demog_q2_label:   "How long have you worked at this organisation?",
+    demog_q2_under1:  "Less than 1 year",
+    demog_q2_one3:    "1–3 years",
+    demog_q2_three7:  "3–7 years",
+    demog_q2_over7:   "More than 7 years",
+    demog_q2_skip:    "Prefer not to say",
+
+    demog_q3_label:   "Which best describes your role?",
+    demog_q3_ic:      "Individual Contributor",
+    demog_q3_mgr:     "Manager / Team Lead",
+    demog_q3_skip:    "Prefer not to say",
+
     // ── Department selector ───────────────────────────────
     dept_title:       "Which department do you work in?",
     dept_subtitle:    "This helps compare results across teams. Department results are only shown when 5 or more people in a department respond.",
@@ -314,6 +337,29 @@ const ui = {
     consent_checkbox:      "لقد قرأت المعلومات أعلاه وفهمتها. أوافق على جمع ردودي المجهولة وتخزينها واستخدامها على النحو الموصوف.",
     consent_cta:           "أوافق — ابدأ التقييم",
     consent_must_agree:    "يُرجى تحديد المربع أعلاه لإعطاء موافقتك قبل المتابعة.",
+
+    // ── Demographic screen ────────────────────────────────
+    demog_title:      "بعض الأسئلة الاختيارية",
+    demog_subtitle:   "تساعدنا هذه التفاصيل المجهولة على تقديم رؤى أكثر معنى. جميع الأسئلة اختيارية — تخطَّ أيًّا منها إذا كنت لا ترغب في الإجابة.",
+    demog_skip_all:   "تخطّي الجميع",
+    demog_cta:        "متابعة",
+
+    demog_q1_label:   "هل أنت مواطن سعودي؟",
+    demog_q1_yes:     "نعم",
+    demog_q1_no:      "لا",
+    demog_q1_skip:    "أفضّل عدم الإفصاح",
+
+    demog_q2_label:   "كم من الوقت أمضيتَ في هذه المنظمة؟",
+    demog_q2_under1:  "أقل من سنة",
+    demog_q2_one3:    "من 1 إلى 3 سنوات",
+    demog_q2_three7:  "من 3 إلى 7 سنوات",
+    demog_q2_over7:   "أكثر من 7 سنوات",
+    demog_q2_skip:    "أفضّل عدم الإفصاح",
+
+    demog_q3_label:   "ما الذي يصف دورك بشكل أفضل؟",
+    demog_q3_ic:      "مساهم فردي",
+    demog_q3_mgr:     "مدير / قائد فريق",
+    demog_q3_skip:    "أفضّل عدم الإفصاح",
 
     // ── Department selector ───────────────────────────────
     dept_title:       "في أي قسم تعمل؟",
