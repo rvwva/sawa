@@ -136,9 +136,9 @@ const ui = {
     guidance_culture_needs_attn:    "This area needs focused attention and investment.",
 
     // ── Demographic split (dashboard) ────────────────────
-    demog_tab:             "Demographic Split",
-    demog_subtitle:        "Anonymous demographic breakdowns",
-    demog_nationality_tab: "Nationality",
+    demog_tab:              "Demographic Split",
+    demog_section_subtitle: "Anonymous demographic breakdowns",
+    demog_nationality_tab:  "Nationality",
     demog_tenure_tab:      "Tenure",
     demog_seniority_tab:   "Seniority",
 
@@ -448,9 +448,9 @@ const ui = {
     guidance_culture_needs_attn:    "هذا المجال يحتاج إلى اهتمام واستثمار مركّز.",
 
     // ── Demographic split (dashboard) ────────────────────
-    demog_tab:             "التوزيع الديموغرافي",
-    demog_subtitle:        "تفصيل ديموغرافي مجهول الهوية",
-    demog_nationality_tab: "الجنسية",
+    demog_tab:              "التوزيع الديموغرافي",
+    demog_section_subtitle: "تفصيل ديموغرافي مجهول الهوية",
+    demog_nationality_tab:  "الجنسية",
     demog_tenure_tab:      "مدة الخدمة",
     demog_seniority_tab:   "المستوى الوظيفي",
 

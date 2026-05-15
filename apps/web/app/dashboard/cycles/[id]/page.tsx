@@ -737,7 +737,7 @@ function DemographicSection({ data, lang }: { data: DemographicData; lang: "en" 
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-100">
         <h2 className="font-semibold text-gray-800">{t("demog_tab")}</h2>
-        <p className="text-xs text-gray-400 mt-0.5">{t("demog_subtitle")}</p>
+        <p className="text-xs text-gray-400 mt-0.5">{t("demog_section_subtitle")}</p>
       </div>
 
       {/* Tabs */}
