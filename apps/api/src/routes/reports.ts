@@ -135,33 +135,62 @@ reportsRouter.get(
     try {
       const { organisationId } = req.params;
 
-      const [totalCycles, activeCycles, totalRespondents, recentScores] = await Promise.all([
-        prisma.assessmentCycle.count({ where: { organisationId } }),
-        prisma.assessmentCycle.count({ where: { organisationId, status: "ACTIVE" } }),
-        prisma.respondent.count({
-          where: { cycle: { organisationId }, submittedAt: { not: null } },
-        }),
-        prisma.score.findMany({
+      const [totalCycles, activeCycles, totalRespondents, totalEnrolled, cycleAssessments] =
+        await Promise.all([
+          prisma.assessmentCycle.count({ where: { organisationId } }),
+          prisma.assessmentCycle.count({ where: { organisationId, status: "ACTIVE" } }),
+          prisma.respondent.count({
+            where: { cycle: { organisationId }, submittedAt: { not: null } },
+          }),
+          prisma.respondent.count({
+            where: { cycle: { organisationId, status: { not: "DRAFT" } } },
+          }),
+          prisma.assessmentCycle.findMany({
+            where: { organisationId, status: { not: "ARCHIVED" } },
+            select: { assessment: { select: { type: true } } },
+          }),
+        ]);
+
+      // Participation rate — always meaningful regardless of assessment mix
+      const participationRate =
+        totalEnrolled > 0
+          ? Math.round((totalRespondents / totalEnrolled) * 1000) / 10
+          : null;
+
+      // Average score — only meaningful when all non-archived cycles share one type
+      const distinctTypes = [...new Set(cycleAssessments.map((c) => c.assessment.type))];
+      const singleType = distinctTypes.length === 1 ? distinctTypes[0] : null;
+
+      let avgScore: number | null = null;
+      let scoreAssessmentType: string | null = null;
+
+      if (singleType) {
+        const scores = await prisma.score.findMany({
           where: {
-            respondent: { cycle: { organisationId } },
+            respondent: {
+              cycle: { organisationId, assessment: { type: singleType as any } },
+              submittedAt: { not: null },
+            },
             subscale: "total",
           },
           orderBy: { createdAt: "desc" },
           take: 100,
-          select: { scaledScore: true, band: true, createdAt: true },
-        }),
-      ]);
-
-      const avgScore =
-        recentScores.length > 0
-          ? recentScores.reduce((a, b) => a + b.scaledScore, 0) / recentScores.length
-          : null;
+          select: { scaledScore: true },
+        });
+        if (scores.length > 0) {
+          const sum = scores.reduce((a, b) => a + b.scaledScore, 0);
+          avgScore = Math.round((sum / scores.length) * 10) / 10;
+          scoreAssessmentType = singleType;
+        }
+      }
 
       return res.json({
         totalCycles,
         activeCycles,
         totalRespondents,
-        avgScore: avgScore !== null ? Math.round(avgScore * 10) / 10 : null,
+        avgScore,
+        scoreAssessmentType,
+        participationRate,
       });
     } catch (err) { next(err); }
   }

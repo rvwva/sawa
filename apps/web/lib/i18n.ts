@@ -184,6 +184,7 @@ const ui = {
     stat_active_cycles:   "Active Cycles",
     stat_respondents:     "Total Respondents",
     stat_avg_score:       "Avg Score",
+    stat_participation:   "Participation",
 
     section_scores:       "Organisation Scores",
     section_trend:        "Score Trend",
@@ -501,6 +502,7 @@ const ui = {
     stat_active_cycles:   "الدورات النشطة",
     stat_respondents:     "إجمالي المشاركين",
     stat_avg_score:       "متوسط الدرجات",
+    stat_participation:   "نسبة المشاركة",
 
     section_scores:       "درجات المؤسسة",
     section_trend:        "مؤشر الاتجاه",

@@ -12,6 +12,8 @@ type DashStats = {
   activeCycles: number;
   totalRespondents: number;
   avgScore: number | null;
+  scoreAssessmentType?: string | null;
+  participationRate?: number | null;
 };
 
 type Cycle = {
@@ -173,10 +175,17 @@ export default function DashboardOverviewPage() {
           <StatCard label={t("stat_total_cycles")}  value={stats.totalCycles} />
           <StatCard label={t("stat_active_cycles")} value={stats.activeCycles} highlight />
           <StatCard label={t("stat_respondents")}   value={stats.totalRespondents} />
-          <StatCard
-            label={t("stat_avg_score")}
-            value={stats.avgScore !== null ? `${stats.avgScore}/100` : "—"}
-          />
+          {stats.scoreAssessmentType ? (
+            <StatCard
+              label={`${stats.scoreAssessmentType} · ${t("stat_avg_score")}`}
+              value={stats.avgScore !== null ? `${stats.avgScore}/100` : "—"}
+            />
+          ) : (
+            <StatCard
+              label={t("stat_participation")}
+              value={stats.participationRate != null ? `${stats.participationRate}%` : "—"}
+            />
+          )}
         </div>
       )}
 

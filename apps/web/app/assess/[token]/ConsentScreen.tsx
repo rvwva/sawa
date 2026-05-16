@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import type { Lang } from "@/lib/i18n";
 import { useTranslations, dir } from "@/lib/i18n";
 import type { CycleInfo } from "./page";
@@ -136,6 +137,14 @@ export default function ConsentScreen({ lang, cycleInfo, onAccept }: Props) {
             <span aria-hidden>⚠</span> {t("consent_must_agree")}
           </p>
         )}
+
+        <p className="text-xs text-gray-400">
+          {lang === "ar" ? "للاطلاع على تفاصيل معالجة البيانات، راجع" : "For full details on how your data is handled, read our"}{" "}
+          <Link href="/privacy" target="_blank" className="underline text-brand-500 hover:text-brand-700">
+            {lang === "ar" ? "سياسة الخصوصية" : "Privacy Policy"}
+          </Link>
+          {lang === "ar" ? "." : "."}
+        </p>
 
         <button
           onClick={handleCta}

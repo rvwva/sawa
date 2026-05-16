@@ -2,6 +2,8 @@ import { Router, Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
+import { auditLog } from "../middleware/audit";
+import { AuditAction } from "@prisma/client";
 
 export const adminRouter = Router();
 
@@ -264,6 +266,103 @@ adminRouter.get(
           department: s.department ?? "(no department)",
           count: s._count.id,
         })),
+      });
+    } catch (err) { next(err); }
+  }
+);
+
+// ─── GET /api/admin/run-cycle-engine ─────────────────────────────────────────
+// Checks all orgs with cycleFrequencyDays > 0 and auto-creates a DRAFT cycle
+// when lastClosed.endsAt + cycleFrequencyDays <= today and no DRAFT/ACTIVE exists.
+// Safe to call repeatedly (idempotent — skips if a live cycle already exists).
+// Can be triggered by a Railway cron via a bearer-token authenticated GET.
+
+adminRouter.get(
+  "/run-cycle-engine",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const today = new Date();
+
+      const orgs = await prisma.organisation.findMany({
+        where: { cycleFrequencyDays: { gt: 0 } },
+        select: { id: true, name: true, cycleFrequencyDays: true },
+      });
+
+      const created: Array<{ orgId: string; orgName: string; cycleId: string; title: string }> = [];
+      const skipped: Array<{ orgId: string; orgName: string; reason: string }> = [];
+
+      for (const org of orgs) {
+        const freq = org.cycleFrequencyDays!;
+
+        const lastClosed = await prisma.assessmentCycle.findFirst({
+          where: { organisationId: org.id, status: "CLOSED" },
+          orderBy: { endsAt: "desc" },
+          select: { id: true, title: true, assessmentId: true, endsAt: true },
+        });
+
+        if (!lastClosed) {
+          skipped.push({ orgId: org.id, orgName: org.name, reason: "no_closed_cycle" });
+          continue;
+        }
+
+        const nextDue = new Date(lastClosed.endsAt);
+        nextDue.setDate(nextDue.getDate() + freq);
+        if (nextDue > today) {
+          skipped.push({ orgId: org.id, orgName: org.name, reason: "not_due_yet" });
+          continue;
+        }
+
+        // Skip if a DRAFT or ACTIVE cycle already exists for this assessment in this org
+        const existing = await prisma.assessmentCycle.findFirst({
+          where: {
+            organisationId: org.id,
+            assessmentId: lastClosed.assessmentId,
+            status: { in: ["DRAFT", "ACTIVE"] },
+          },
+        });
+        if (existing) {
+          skipped.push({ orgId: org.id, orgName: org.name, reason: "cycle_already_exists" });
+          continue;
+        }
+
+        const newEndsAt = new Date(today);
+        newEndsAt.setDate(newEndsAt.getDate() + freq);
+
+        const newCycle = await prisma.assessmentCycle.create({
+          data: {
+            organisationId: org.id,
+            assessmentId: lastClosed.assessmentId,
+            title: lastClosed.title,
+            status: "DRAFT",
+            startsAt: today,
+            endsAt: newEndsAt,
+          },
+        });
+
+        await auditLog(AuditAction.CYCLE_CREATED, {
+          userId: req.user!.userId,
+          entityType: "AssessmentCycle",
+          entityId: newCycle.id,
+          metadata: {
+            autoCreated: true,
+            orgName: org.name,
+            clonedFromCycleId: lastClosed.id,
+            frequencyDays: freq,
+          },
+          req,
+        });
+
+        created.push({ orgId: org.id, orgName: org.name, cycleId: newCycle.id, title: newCycle.title });
+      }
+
+      return res.json({
+        ranAt: today.toISOString(),
+        orgsChecked: orgs.length,
+        cyclesCreated: created.length,
+        created,
+        skipped,
       });
     } catch (err) { next(err); }
   }

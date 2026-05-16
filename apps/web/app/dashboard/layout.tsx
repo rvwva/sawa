@@ -110,6 +110,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* User footer */}
         <div className="px-4 py-4 border-t border-gray-100 space-y-3">
+          <Link
+            href="/privacy"
+            target="_blank"
+            className="block text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            {lang === "ar" ? "سياسة الخصوصية" : "Privacy Policy"}
+          </Link>
           <div className="min-w-0">
             <p className="text-sm font-medium text-gray-700 truncate">
               {user.firstName} {user.lastName}

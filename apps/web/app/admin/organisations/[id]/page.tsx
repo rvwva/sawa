@@ -66,7 +66,12 @@ const FREQ_OPTIONS = [
   { value: 90, labelKey: "freq_quarterly" },
 ] as const;
 
-const ASSESSMENT_TYPES = ["CBI", "PSS", "WHO5", "CULTURE"];
+const ASSESSMENT_TYPE_OPTIONS = [
+  { value: "CBI",     disabled: false },
+  { value: "PSS",     disabled: true  },
+  { value: "WHO5",    disabled: false },
+  { value: "CULTURE", disabled: false },
+];
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-SA", {
@@ -317,7 +322,13 @@ function CyclesTab({
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">{t("admin_cycle_type")}</label>
                 <select value={type} onChange={(e) => setType(e.target.value)} className={SELECT}>
-                  {ASSESSMENT_TYPES.map((a) => <option key={a}>{a}</option>)}
+                  {ASSESSMENT_TYPE_OPTIONS.map(({ value, disabled }) => (
+                    <option key={value} value={value} disabled={disabled}>
+                      {disabled
+                        ? `${value} — ${lang === "ar" ? "في انتظار الموافقة على الترخيص" : "Pending license approval"}`
+                        : value}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
