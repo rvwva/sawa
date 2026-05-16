@@ -164,6 +164,11 @@ const ui = {
     demog_dept_level:        "By Department",
     demog_no_data:           "No demographic data collected yet for this cycle.",
 
+    demog_insight_new_joiner_high: "New joiners showing significantly higher scores — possible onboarding gap",
+    demog_insight_new_joiner_low:  "New joiners scoring significantly lower than long-tenured peers — possible onboarding gap",
+    demog_insight_ic_worse:        "Workload may be concentrated at individual contributor level",
+    demog_insight_mgr_worse:       "Leadership layer showing strain — monitor closely",
+
     // ── Print / PDF ───────────────────────────────────────
     print_title:  "My Mindlign Assessment Results",
     print_date:   "Assessment date",
@@ -475,6 +480,11 @@ const ui = {
     demog_org_level:         "على مستوى المنظمة",
     demog_dept_level:        "حسب القسم",
     demog_no_data:           "لم يتم جمع بيانات ديموغرافية لهذه الدورة بعد.",
+
+    demog_insight_new_joiner_high: "المنتسبون الجدد يُظهرون درجات أعلى بشكل ملحوظ — ثغرة محتملة في الإعداد الوظيفي",
+    demog_insight_new_joiner_low:  "المنتسبون الجدد يسجلون درجات أقل بكثير من زملائهم الأكثر خبرة — ثغرة محتملة في الإعداد الوظيفي",
+    demog_insight_ic_worse:        "قد يكون عبء العمل مركّزاً على مستوى المساهمين الأفراد",
+    demog_insight_mgr_worse:       "الطبقة القيادية تُظهر ضغطاً — يُنصح بالمتابعة الدقيقة",
 
     // ── Print / PDF ───────────────────────────────────────
     print_title:  "نتائج تقييم Mindlign",

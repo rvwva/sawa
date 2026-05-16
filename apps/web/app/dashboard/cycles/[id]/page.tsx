@@ -90,12 +90,26 @@ type DeptNationalityCrossTab = {
   }>;
 };
 
+type DeptSegmentCrossTab = {
+  departmentId: string;
+  departmentName: string;
+  segments: Array<{
+    value: string;
+    label: string;
+    respondentCount: number;
+    suppressed: boolean;
+    subscales: SubscaleAgg[];
+  }>;
+};
+
 type DemographicData = {
   cycleId: string;
   nationality: DemographicDimension;
   tenure: DemographicDimension;
   seniority: DemographicDimension;
   departmentNationalityCrossTab: DeptNationalityCrossTab[];
+  deptByTenure: DeptSegmentCrossTab[];
+  deptBySeniority: DeptSegmentCrossTab[];
   saudiCount: number;
   nonSaudiCount: number;
   unknownNationalityCount: number;
@@ -674,7 +688,7 @@ export default function CycleDetailPage() {
 
       {/* ── E) Demographic Split ── */}
       {demographicData && (
-        <DemographicSection data={demographicData} lang={lang} />
+        <DemographicSection data={demographicData} lang={lang} assessmentType={cycleResult?.assessment?.type} />
       )}
 
     </div>
@@ -687,7 +701,8 @@ export default function CycleDetailPage() {
 
 type DemogTab = "nationality" | "tenure" | "seniority";
 
-function DemographicSection({ data, lang }: { data: DemographicData; lang: "en" | "ar" }) {
+function DemographicSection({ data, lang, assessmentType }: { data: DemographicData; lang: "en" | "ar"; assessmentType?: string }) {
+  const HIGHER_IS_WORSE = ["CBI", "PSS"].includes(assessmentType ?? "");
   const t = useTranslations(lang);
   const [activeTab, setActiveTab] = useState<DemogTab>("nationality");
 
@@ -938,28 +953,198 @@ function DemographicSection({ data, lang }: { data: DemographicData; lang: "en" 
           </>
         )}
 
-        {/* ── Tenure / Seniority tabs — generic segment bars ── */}
-        {(activeTab === "tenure" || activeTab === "seniority") && (() => {
-          const dim = activeTab === "tenure" ? data.tenure : data.seniority;
-          const colors = ["#d97706","#2563eb","#7c3aed","#16a34a","#dc2626"];
+        {/* ── Tenure tab ── */}
+        {activeTab === "tenure" && (() => {
+          const tenureColors: Record<string, string> = {
+            UNDER_1Y:    "#d97706",
+            ONE_TO_3Y:   "#2563eb",
+            THREE_TO_7Y: "#7c3aed",
+            OVER_7Y:     "#16a34a",
+          };
+
+          // Org-level insight: UNDER_1Y vs avg(THREE_TO_7Y, OVER_7Y)
+          const tenureSegs = data.tenure.segments;
+          const under1  = tenureSegs.find((s) => s.value === "UNDER_1Y");
+          const three7  = tenureSegs.find((s) => s.value === "THREE_TO_7Y");
+          const over7   = tenureSegs.find((s) => s.value === "OVER_7Y");
+          const under1Total  = under1?.suppressed  ? null : under1?.subscales.find((s) => s.subscale === "total")?.avg;
+          const three7Total  = three7?.suppressed  ? null : three7?.subscales.find((s) => s.subscale === "total")?.avg;
+          const over7Total   = over7?.suppressed   ? null : over7?.subscales.find((s) => s.subscale === "total")?.avg;
+          const longTermAvg  = [three7Total, over7Total].filter((v): v is number => v != null);
+          const longTermMean = longTermAvg.length > 0 ? longTermAvg.reduce((a, b) => a + b, 0) / longTermAvg.length : null;
+          let tenureInsightKey: string | null = null;
+          if (under1Total != null && longTermMean != null) {
+            const diff = under1Total - longTermMean;
+            if (HIGHER_IS_WORSE && diff >= 15)  tenureInsightKey = "demog_insight_new_joiner_high";
+            if (HIGHER_IS_WORSE && diff <= -15) tenureInsightKey = "demog_insight_new_joiner_low";
+            if (!HIGHER_IS_WORSE && diff <= -15) tenureInsightKey = "demog_insight_new_joiner_low";
+            if (!HIGHER_IS_WORSE && diff >= 15)  tenureInsightKey = "demog_insight_new_joiner_high";
+          }
+
           return (
-            <div className="space-y-3">
-              {dim.segments.map((seg, i) => {
-                const total = seg.subscales.find((s) => s.subscale === "total");
-                return (
-                  <SegmentBar
-                    key={seg.value}
-                    label={seg.label}
-                    count={seg.respondentCount}
-                    suppressed={seg.suppressed}
-                    avg={total?.avg}
-                    band={total?.band}
-                    color={colors[i % colors.length]}
-                    lang={lang}
-                    t={t}
-                  />
-                );
-              })}
+            <div className="space-y-6">
+              {tenureInsightKey && (
+                <div className="flex items-start gap-3 rounded-xl px-4 py-3 border bg-amber-50 border-amber-200 text-sm">
+                  <span className="text-lg shrink-0 mt-0.5">⚠️</span>
+                  <span className="text-amber-700">{t(tenureInsightKey as any)}</span>
+                </div>
+              )}
+
+              {/* Org-level tenure bars */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">{t("demog_org_level")}</p>
+                <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 space-y-3">
+                  {tenureSegs.map((seg) => {
+                    const total = seg.subscales.find((s) => s.subscale === "total");
+                    return (
+                      <SegmentBar key={seg.value} label={seg.label} count={seg.respondentCount}
+                        suppressed={seg.suppressed} avg={total?.avg} band={total?.band}
+                        color={tenureColors[seg.value] ?? "#6b7280"} lang={lang} t={t} />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Per-dept cards */}
+              {data.deptByTenure.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">{t("demog_dept_level")}</p>
+                  <div className="space-y-4">
+                    {data.deptByTenure.map((dept) => {
+                      // Dept-level insight
+                      const dUnder1  = dept.segments.find((s) => s.value === "UNDER_1Y");
+                      const dThree7  = dept.segments.find((s) => s.value === "THREE_TO_7Y");
+                      const dOver7   = dept.segments.find((s) => s.value === "OVER_7Y");
+                      const dU1t  = dUnder1?.suppressed  ? null : dUnder1?.subscales.find((s) => s.subscale === "total")?.avg;
+                      const dT7t  = dThree7?.suppressed  ? null : dThree7?.subscales.find((s) => s.subscale === "total")?.avg;
+                      const dO7t  = dOver7?.suppressed   ? null : dOver7?.subscales.find((s) => s.subscale === "total")?.avg;
+                      const dLTAvg = [dT7t, dO7t].filter((v): v is number => v != null);
+                      const dLTMean = dLTAvg.length > 0 ? dLTAvg.reduce((a, b) => a + b, 0) / dLTAvg.length : null;
+                      let dInsightKey: string | null = null;
+                      if (dU1t != null && dLTMean != null) {
+                        const dDiff = dU1t - dLTMean;
+                        if (HIGHER_IS_WORSE && dDiff >= 15)  dInsightKey = "demog_insight_new_joiner_high";
+                        if (HIGHER_IS_WORSE && dDiff <= -15) dInsightKey = "demog_insight_new_joiner_low";
+                        if (!HIGHER_IS_WORSE && dDiff <= -15) dInsightKey = "demog_insight_new_joiner_low";
+                        if (!HIGHER_IS_WORSE && dDiff >= 15)  dInsightKey = "demog_insight_new_joiner_high";
+                      }
+                      return (
+                        <div key={dept.departmentId} className={`border rounded-xl overflow-hidden ${dInsightKey ? "border-amber-200" : "border-gray-100"}`}>
+                          <div className={`px-4 py-2.5 ${dInsightKey ? "bg-amber-50" : "bg-gray-50"}`}>
+                            <h4 className="font-semibold text-gray-900 text-sm">{dept.departmentName}</h4>
+                          </div>
+                          <div className="px-4 py-3 space-y-2.5">
+                            {dept.segments.map((seg) => {
+                              const total = seg.subscales.find((s) => s.subscale === "total");
+                              return (
+                                <SegmentBar key={seg.value} label={seg.label} count={seg.respondentCount}
+                                  suppressed={seg.suppressed} avg={total?.avg} band={total?.band}
+                                  color={tenureColors[seg.value] ?? "#6b7280"} lang={lang} t={t} />
+                              );
+                            })}
+                            {dInsightKey && (
+                              <p className="text-xs text-amber-600 pt-1">{t(dInsightKey as any)}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ── Seniority tab ── */}
+        {activeTab === "seniority" && (() => {
+          const seniorityColors: Record<string, string> = {
+            INDIVIDUAL_CONTRIBUTOR: "#2563eb",
+            MANAGER:                "#7c3aed",
+          };
+
+          // Org-level insight: |IC_total – Mgr_total| >= 15
+          const senioritySegs = data.seniority.segments;
+          const icSeg  = senioritySegs.find((s) => s.value === "INDIVIDUAL_CONTRIBUTOR");
+          const mgrSeg = senioritySegs.find((s) => s.value === "MANAGER");
+          const icTotal  = icSeg?.suppressed  ? null : icSeg?.subscales.find((s) => s.subscale === "total")?.avg;
+          const mgrTotal = mgrSeg?.suppressed ? null : mgrSeg?.subscales.find((s) => s.subscale === "total")?.avg;
+          let seniorityInsightKey: string | null = null;
+          if (icTotal != null && mgrTotal != null) {
+            const diff = icTotal - mgrTotal;
+            const icWorse  = HIGHER_IS_WORSE ? diff >= 15  : diff <= -15;
+            const mgrWorse = HIGHER_IS_WORSE ? diff <= -15 : diff >= 15;
+            if (icWorse)  seniorityInsightKey = "demog_insight_ic_worse";
+            if (mgrWorse) seniorityInsightKey = "demog_insight_mgr_worse";
+          }
+
+          return (
+            <div className="space-y-6">
+              {seniorityInsightKey && (
+                <div className="flex items-start gap-3 rounded-xl px-4 py-3 border bg-amber-50 border-amber-200 text-sm">
+                  <span className="text-lg shrink-0 mt-0.5">⚠️</span>
+                  <span className="text-amber-700">{t(seniorityInsightKey as any)}</span>
+                </div>
+              )}
+
+              {/* Org-level seniority bars */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">{t("demog_org_level")}</p>
+                <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 space-y-3">
+                  {senioritySegs.map((seg) => {
+                    const total = seg.subscales.find((s) => s.subscale === "total");
+                    return (
+                      <SegmentBar key={seg.value} label={seg.label} count={seg.respondentCount}
+                        suppressed={seg.suppressed} avg={total?.avg} band={total?.band}
+                        color={seniorityColors[seg.value] ?? "#6b7280"} lang={lang} t={t} />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Per-dept cards */}
+              {data.deptBySeniority.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">{t("demog_dept_level")}</p>
+                  <div className="space-y-4">
+                    {data.deptBySeniority.map((dept) => {
+                      // Dept-level insight
+                      const dIC  = dept.segments.find((s) => s.value === "INDIVIDUAL_CONTRIBUTOR");
+                      const dMgr = dept.segments.find((s) => s.value === "MANAGER");
+                      const dICt  = dIC?.suppressed  ? null : dIC?.subscales.find((s) => s.subscale === "total")?.avg;
+                      const dMgrt = dMgr?.suppressed ? null : dMgr?.subscales.find((s) => s.subscale === "total")?.avg;
+                      let dInsightKey: string | null = null;
+                      if (dICt != null && dMgrt != null) {
+                        const dDiff = dICt - dMgrt;
+                        const dIcWorse  = HIGHER_IS_WORSE ? dDiff >= 15  : dDiff <= -15;
+                        const dMgrWorse = HIGHER_IS_WORSE ? dDiff <= -15 : dDiff >= 15;
+                        if (dIcWorse)  dInsightKey = "demog_insight_ic_worse";
+                        if (dMgrWorse) dInsightKey = "demog_insight_mgr_worse";
+                      }
+                      return (
+                        <div key={dept.departmentId} className={`border rounded-xl overflow-hidden ${dInsightKey ? "border-amber-200" : "border-gray-100"}`}>
+                          <div className={`px-4 py-2.5 ${dInsightKey ? "bg-amber-50" : "bg-gray-50"}`}>
+                            <h4 className="font-semibold text-gray-900 text-sm">{dept.departmentName}</h4>
+                          </div>
+                          <div className="px-4 py-3 space-y-2.5">
+                            {dept.segments.map((seg) => {
+                              const total = seg.subscales.find((s) => s.subscale === "total");
+                              return (
+                                <SegmentBar key={seg.value} label={seg.label} count={seg.respondentCount}
+                                  suppressed={seg.suppressed} avg={total?.avg} band={total?.band}
+                                  color={seniorityColors[seg.value] ?? "#6b7280"} lang={lang} t={t} />
+                              );
+                            })}
+                            {dInsightKey && (
+                              <p className="text-xs text-amber-600 pt-1">{t(dInsightKey as any)}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}

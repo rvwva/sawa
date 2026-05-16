@@ -366,12 +366,21 @@ export interface DeptNationalityCrossTab {
   }>;
 }
 
+/** Generic dept × demographic-dimension cross-tab (tenure or seniority). */
+export interface DeptSegmentCrossTab {
+  departmentId: string;
+  departmentName: string;
+  segments: DemographicSegmentResult[];
+}
+
 export interface DemographicBreakdown {
   cycleId: string;
   nationality: DemographicDimensionResult;
   tenure: DemographicDimensionResult;
   seniority: DemographicDimensionResult;
   departmentNationalityCrossTab: DeptNationalityCrossTab[];
+  deptByTenure: DeptSegmentCrossTab[];
+  deptBySeniority: DeptSegmentCrossTab[];
   saudiCount: number;
   nonSaudiCount: number;
   unknownNationalityCount: number;
@@ -595,6 +604,70 @@ export async function aggregateDemographicScores(
     })
   );
 
+  // ── Department × Tenure cross-tab ───────────────────────────────────────
+  const deptTenureMap = new Map<string, { name: string; groups: Record<string, string[]> }>();
+  for (const r of respondents) {
+    if (!r.departmentId || !r.tenureRange) continue;
+    if (!deptTenureMap.has(r.departmentId)) {
+      deptTenureMap.set(r.departmentId, {
+        name: r.department?.name ?? "Unknown",
+        groups: Object.fromEntries(tenureOrder.map((k) => [k, []])),
+      });
+    }
+    deptTenureMap.get(r.departmentId)!.groups[r.tenureRange].push(r.id);
+  }
+
+  const deptByTenure: DeptSegmentCrossTab[] = await Promise.all(
+    Array.from(deptTenureMap.entries()).map(async ([deptId, { name, groups }]) => {
+      const segments = await Promise.all(
+        tenureOrder.map(async (value) => {
+          const ids = groups[value];
+          const agg = ids.length >= MIN_DEPT_RESPONDENTS ? await aggregateScoresForIds(cycleId, ids) : null;
+          return {
+            value,
+            label: tenureLabels[value],
+            respondentCount: ids.length,
+            suppressed: ids.length < MIN_DEPT_RESPONDENTS,
+            subscales: agg?.subscales ?? [],
+          };
+        })
+      );
+      return { departmentId: deptId, departmentName: name, segments };
+    })
+  );
+
+  // ── Department × Seniority cross-tab ────────────────────────────────────
+  const deptSeniorityMap = new Map<string, { name: string; groups: Record<string, string[]> }>();
+  for (const r of respondents) {
+    if (!r.departmentId || !r.seniorityLevel) continue;
+    if (!deptSeniorityMap.has(r.departmentId)) {
+      deptSeniorityMap.set(r.departmentId, {
+        name: r.department?.name ?? "Unknown",
+        groups: Object.fromEntries(seniorityOrder.map((k) => [k, []])),
+      });
+    }
+    deptSeniorityMap.get(r.departmentId)!.groups[r.seniorityLevel].push(r.id);
+  }
+
+  const deptBySeniority: DeptSegmentCrossTab[] = await Promise.all(
+    Array.from(deptSeniorityMap.entries()).map(async ([deptId, { name, groups }]) => {
+      const segments = await Promise.all(
+        seniorityOrder.map(async (value) => {
+          const ids = groups[value];
+          const agg = ids.length >= MIN_DEPT_RESPONDENTS ? await aggregateScoresForIds(cycleId, ids) : null;
+          return {
+            value,
+            label: seniorityLabels[value],
+            respondentCount: ids.length,
+            suppressed: ids.length < MIN_DEPT_RESPONDENTS,
+            subscales: agg?.subscales ?? [],
+          };
+        })
+      );
+      return { departmentId: deptId, departmentName: name, segments };
+    })
+  );
+
   const answeredCount = saudiIds.length + nonSaudiIds.length;
 
   return {
@@ -603,6 +676,8 @@ export async function aggregateDemographicScores(
     tenure:   { dimension: "tenure",   segments: tenureSegments   },
     seniority:{ dimension: "seniority",segments: senioritySegments },
     departmentNationalityCrossTab,
+    deptByTenure,
+    deptBySeniority,
     saudiCount: saudiIds.length,
     nonSaudiCount: nonSaudiIds.length,
     unknownNationalityCount,
