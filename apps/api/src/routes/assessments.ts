@@ -48,7 +48,7 @@ assessmentsRouter.post(
   requireRole("ADMIN", "EXECUTIVE"),
   [
     body("title").notEmpty().isString(),
-    body("assessmentType").isIn(["CBI", "PSS", "WHO5", "CULTURE"]),
+    body("assessmentType").isIn(["CBI", "WHO5", "CULTURE"]),
     body("startsAt").isISO8601(),
     body("endsAt").isISO8601(),
   ],

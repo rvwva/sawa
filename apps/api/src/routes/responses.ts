@@ -14,7 +14,6 @@ const SCORING_KEY = process.env.SCORING_SERVICE_API_KEY ?? "dev-scoring-key";
 
 const ASSESSMENT_ROUTE: Record<string, string> = {
   CBI: "cbi",
-  PSS: "pss",
   WHO5: "who5",
   CULTURE: "culture",
 };
@@ -261,14 +260,10 @@ function buildScoreRows(
     }
   }
 
-  // PSS / WHO-5 / CBI total
+  // WHO-5 / CBI total (WHO-5 already returns 0–100; CBI already 0–100)
   if (result.total) {
     const rawScore    = result.total.raw_score ?? result.total.score;
-    // PSS returns raw 0–40; normalize to 0–100 to match every other assessment.
-    // WHO-5 already returns percentage_score (0–100) as result.total.score.
-    const scaledScore = assessmentType === "PSS"
-      ? Math.round((result.total.score / 40) * 1000) / 10
-      : result.total.score;
+    const scaledScore = result.total.score;
     rows.push({ respondentId, subscale: "total", rawScore, scaledScore, band: result.total.band });
   }
 

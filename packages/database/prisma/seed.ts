@@ -5,10 +5,6 @@ import {
   CBI_SCORING_RULES,
 } from "../../scoring/definitions/cbi";
 import {
-  PSS_SURVEY_SCHEMA,
-  PSS_SCORING_RULES,
-} from "../../scoring/definitions/pss";
-import {
   WHO5_SURVEY_SCHEMA,
   WHO5_SCORING_RULES,
 } from "../../scoring/definitions/who5";
@@ -33,17 +29,6 @@ async function main() {
       itemCount: 19,
       surveySchema: CBI_SURVEY_SCHEMA,
       scoringRules: CBI_SCORING_RULES,
-      version: "1.0",
-    },
-    {
-      type: AssessmentType.PSS,
-      name: "Perceived Stress Scale",
-      nameAr: "مقياس الضغط النفسي المُدرَك",
-      description:
-        "Measures the degree to which life situations are appraised as stressful across 10 items.",
-      itemCount: 10,
-      surveySchema: PSS_SURVEY_SCHEMA,
-      scoringRules: PSS_SCORING_RULES,
       version: "1.0",
     },
     {

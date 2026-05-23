@@ -68,7 +68,6 @@ const FREQ_OPTIONS = [
 
 const ASSESSMENT_TYPE_OPTIONS = [
   { value: "CBI",     disabled: false },
-  { value: "PSS",     disabled: true  },
   { value: "WHO5",    disabled: false },
   { value: "CULTURE", disabled: false },
 ];
@@ -322,12 +321,8 @@ function CyclesTab({
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">{t("admin_cycle_type")}</label>
                 <select value={type} onChange={(e) => setType(e.target.value)} className={SELECT}>
-                  {ASSESSMENT_TYPE_OPTIONS.map(({ value, disabled }) => (
-                    <option key={value} value={value} disabled={disabled}>
-                      {disabled
-                        ? `${value} — ${lang === "ar" ? "في انتظار الموافقة على الترخيص" : "Pending license approval"}`
-                        : value}
-                    </option>
+                  {ASSESSMENT_TYPE_OPTIONS.map(({ value }) => (
+                    <option key={value} value={value}>{value}</option>
                   ))}
                 </select>
               </div>

@@ -14,11 +14,6 @@ const DEFINITIONS: Record<string, { en: string; ar: string; source: string }> = 
     ar:     "الاحتراق الوظيفي هو حالة من الإرهاق الجسدي والنفسي المطوّل الناتج عن ضغوط العمل أو المتطلبات الشخصية. وهو ليس مرضاً، بل استجابة طبيعية للضغط المستمر.",
     source: "Kristensen TS, et al. (2005). The Copenhagen Burnout Inventory. Work & Stress, 19(3), 192–207.",
   },
-  PSS: {
-    en:     "Perceived stress refers to how unpredictable, uncontrollable, and overwhelming you find your life. This scale measures your subjective experience of stress over the past month.",
-    ar:     "يشير الضغط المُدرَك إلى مدى شعورك بأن حياتك غير قابلة للتنبؤ أو السيطرة أو أنها مُرهِقة. يقيس هذا المقياس تجربتك الشخصية للضغط خلال الشهر الماضي.",
-    source: "Cohen S, Kamarck T, Mermelstein R. (1983). A global measure of perceived stress. Journal of Health and Social Behavior, 24(4), 385–396.",
-  },
   WHO5: {
     en:     "Wellbeing refers to feeling positive, active, and rested in your daily life. This index measures your general mental wellbeing over the past two weeks.",
     ar:     "تشير الرفاهية النفسية إلى الشعور بالإيجابية والنشاط والراحة في حياتك اليومية. يقيس هذا المؤشر رفاهيتك النفسية العامة خلال الأسبوعين الماضيين.",

@@ -21,7 +21,6 @@ enum UserRole {
 
 enum AssessmentType {
   CBI          // Copenhagen Burnout Inventory (19 items)
-  PSS          // Perceived Stress Scale (10 items)
   WHO5         // WHO-5 Wellbeing Index (5 items)
   CULTURE      // Proprietary Culture Assessment (40 items)
 }

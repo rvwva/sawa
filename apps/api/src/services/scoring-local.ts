@@ -5,27 +5,10 @@
 
 type ScoringResult = Record<string, any>;
 
-// ─── PSS-10 ─────────────────────────────────────────────────────────────────
-
-const PSS_POSITIVE = new Set(["pss_4", "pss_5", "pss_7", "pss_8"]);
-const PSS_ITEMS = Array.from({ length: 10 }, (_, i) => `pss_${i + 1}`);
-const PSS_BANDS: [number, number, string][] = [
-  [0, 13, "Low"],
-  [14, 26, "Moderate"],
-  [27, 40, "High"],
-];
+// ─── Band helper ─────────────────────────────────────────────────────────────
 
 function getBand(bands: [number, number, string][], score: number): string {
   return bands.find(([lo, hi]) => score >= lo && score <= hi)?.[2] ?? bands[bands.length - 1][2];
-}
-
-function scoresPSS(responses: Record<string, number>): ScoringResult {
-  let total = 0;
-  for (const key of PSS_ITEMS) {
-    const v = responses[key] ?? 0;
-    total += PSS_POSITIVE.has(key) ? 4 - v : v;
-  }
-  return { total: { score: total, band: getBand(PSS_BANDS, total) } };
 }
 
 // ─── WHO-5 ──────────────────────────────────────────────────────────────────
@@ -125,7 +108,6 @@ export function scoreLocal(
   responses: Record<string, number>,
 ): ScoringResult {
   switch (assessmentType) {
-    case "PSS":     return scoresPSS(responses);
     case "WHO5":    return scoresWHO5(responses);
     case "CBI":     return scoresCBI(responses);
     case "CULTURE": return scoresCulture(responses);

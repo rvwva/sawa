@@ -702,7 +702,7 @@ export default function CycleDetailPage() {
 type DemogTab = "nationality" | "tenure" | "seniority";
 
 function DemographicSection({ data, lang, assessmentType }: { data: DemographicData; lang: "en" | "ar"; assessmentType?: string }) {
-  const HIGHER_IS_WORSE = ["CBI", "PSS"].includes(assessmentType ?? "");
+  const HIGHER_IS_WORSE = assessmentType === "CBI";
   const t = useTranslations(lang);
   const [activeTab, setActiveTab] = useState<DemogTab>("nationality");
 
