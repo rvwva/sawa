@@ -23,6 +23,9 @@ enum AssessmentType {
   CBI          // Copenhagen Burnout Inventory (19 items)
   WHO5         // WHO-5 Wellbeing Index (5 items)
   CULTURE      // Proprietary Culture Assessment (40 items)
+  PSYCH_SAFETY // Psychological Safety Scale (7 items)
+  TURNOVER     // Turnover Intention Scale (3 items)
+  LMX7         // Leader-Member Exchange LMX-7 (7 items)
 }
 
 enum CycleStatus {

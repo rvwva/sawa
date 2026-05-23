@@ -67,9 +67,12 @@ const FREQ_OPTIONS = [
 ] as const;
 
 const ASSESSMENT_TYPE_OPTIONS = [
-  { value: "CBI",     disabled: false },
-  { value: "WHO5",    disabled: false },
-  { value: "CULTURE", disabled: false },
+  { value: "CBI",          disabled: false },
+  { value: "WHO5",         disabled: false },
+  { value: "CULTURE",      disabled: false },
+  { value: "PSYCH_SAFETY", disabled: false },
+  { value: "TURNOVER",     disabled: false },
+  { value: "LMX7",         disabled: false },
 ];
 
 function fmtDate(iso: string): string {

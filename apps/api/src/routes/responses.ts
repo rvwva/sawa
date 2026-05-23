@@ -13,9 +13,12 @@ const SCORING_URL = process.env.SCORING_SERVICE_URL ?? "http://localhost:8000";
 const SCORING_KEY = process.env.SCORING_SERVICE_API_KEY ?? "dev-scoring-key";
 
 const ASSESSMENT_ROUTE: Record<string, string> = {
-  CBI: "cbi",
-  WHO5: "who5",
-  CULTURE: "culture",
+  CBI:          "cbi",
+  WHO5:         "who5",
+  CULTURE:      "culture",
+  PSYCH_SAFETY: "psych_safety",
+  TURNOVER:     "turnover",
+  LMX7:         "lmx7",
 };
 
 /**

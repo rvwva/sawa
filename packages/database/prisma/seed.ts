@@ -12,6 +12,18 @@ import {
   CULTURE_SURVEY_SCHEMA,
   CULTURE_SCORING_RULES,
 } from "../../scoring/definitions/culture";
+import {
+  PSYCH_SAFETY_SURVEY_SCHEMA,
+  PSYCH_SAFETY_SCORING_RULES,
+} from "../../scoring/definitions/psych_safety";
+import {
+  TURNOVER_SURVEY_SCHEMA,
+  TURNOVER_SCORING_RULES,
+} from "../../scoring/definitions/turnover";
+import {
+  LMX7_SURVEY_SCHEMA,
+  LMX7_SCORING_RULES,
+} from "../../scoring/definitions/lmx7";
 
 const prisma = new PrismaClient();
 
@@ -51,6 +63,39 @@ async function main() {
       itemCount: 40,
       surveySchema: CULTURE_SURVEY_SCHEMA,
       scoringRules: CULTURE_SCORING_RULES,
+      version: "1.0",
+    },
+    {
+      type: AssessmentType.PSYCH_SAFETY,
+      name: "Psychological Safety Scale",
+      nameAr: "مقياس السلامة النفسية",
+      description:
+        "Measures psychological safety within teams across 7 items.",
+      itemCount: 7,
+      surveySchema: PSYCH_SAFETY_SURVEY_SCHEMA,
+      scoringRules: PSYCH_SAFETY_SCORING_RULES,
+      version: "1.0",
+    },
+    {
+      type: AssessmentType.TURNOVER,
+      name: "Turnover Intention Scale",
+      nameAr: "مقياس نية ترك العمل",
+      description:
+        "Assesses employee turnover intention across 3 items.",
+      itemCount: 3,
+      surveySchema: TURNOVER_SURVEY_SCHEMA,
+      scoringRules: TURNOVER_SCORING_RULES,
+      version: "1.0",
+    },
+    {
+      type: AssessmentType.LMX7,
+      name: "Leader-Member Exchange (LMX-7)",
+      nameAr: "مقياس التبادل بين القائد والعضو",
+      description:
+        "Measures the quality of the manager-employee relationship across 7 items.",
+      itemCount: 7,
+      surveySchema: LMX7_SURVEY_SCHEMA,
+      scoringRules: LMX7_SCORING_RULES,
       version: "1.0",
     },
   ];

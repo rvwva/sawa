@@ -134,6 +134,15 @@ const ui = {
     guidance_culture_healthy:       "Solid foundations here. Keep building on these strengths.",
     guidance_culture_developing:    "Progress is visible, but meaningful gaps remain.",
     guidance_culture_needs_attn:    "This area needs focused attention and investment.",
+    guidance_psych_healthy:         "Your team has a psychologically safe environment. People feel comfortable speaking up and taking risks.",
+    guidance_psych_moderate:        "Some psychological safety concerns are present. There may be barriers to open communication.",
+    guidance_psych_low:             "Psychological safety needs attention. Employees may feel unable to speak up or take risks.",
+    guidance_turnover_good:         "Low turnover intention. Employees appear committed and engaged with the organisation.",
+    guidance_turnover_moderate:     "Moderate turnover risk. Some employees may be considering leaving.",
+    guidance_turnover_high:         "High turnover risk. Immediate attention to retention is recommended.",
+    guidance_lmx_healthy:           "Strong manager-employee relationships indicate effective leadership practices.",
+    guidance_lmx_moderate:          "Average manager-employee relationship quality. There is room for improvement.",
+    guidance_lmx_low:               "Weak manager-employee relationships need leadership attention and development.",
 
     // ── Demographic split (dashboard) ────────────────────
     demog_tab:              "Demographic Split",
@@ -452,6 +461,15 @@ const ui = {
     guidance_culture_healthy:       "أسس متينة هنا. واصل البناء على هذه النقاط القوية.",
     guidance_culture_developing:    "يظهر تقدم ملموس، لكن ثمة فجوات جوهرية لا تزال قائمة.",
     guidance_culture_needs_attn:    "هذا المجال يحتاج إلى اهتمام واستثمار مركّز.",
+    guidance_psych_healthy:         "يتمتع فريقك ببيئة آمنة نفسياً. يشعر الأفراد بالراحة للتعبير عن آرائهم وتحمّل المخاطر.",
+    guidance_psych_moderate:        "ثمة مخاوف تتعلق بالسلامة النفسية. قد تكون هناك عوائق تحول دون التواصل المفتوح.",
+    guidance_psych_low:             "تحتاج السلامة النفسية إلى اهتمام. قد يشعر الموظفون بعدم قدرتهم على التعبير أو المخاطرة.",
+    guidance_turnover_good:         "نية منخفضة لترك العمل. يبدو أن الموظفين ملتزمون ومنخرطون في المؤسسة.",
+    guidance_turnover_moderate:     "خطر توسط للاستنزاف. قد يفكر بعض الموظفين في المغادرة.",
+    guidance_turnover_high:         "خطر عالٍ للاستنزاف. يُوصى باتخاذ إجراءات فورية للاحتفاظ بالموظفين.",
+    guidance_lmx_healthy:           "العلاقات القوية بين المدير والموظف تدل على ممارسات قيادية فعّالة.",
+    guidance_lmx_moderate:          "جودة متوسطة في العلاقة بين المدير والموظف. ثمة مجال للتحسين.",
+    guidance_lmx_low:               "العلاقات الضعيفة بين المدير والموظف تحتاج إلى تطوير قيادي واهتمام.",
 
     // ── Demographic split (dashboard) ────────────────────
     demog_tab:              "التوزيع الديموغرافي",

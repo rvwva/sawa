@@ -24,6 +24,21 @@ const DEFINITIONS: Record<string, { en: string; ar: string; source: string }> = 
     ar:     "تشير ثقافة المنظمة إلى القيم والسلوكيات والممارسات المشتركة التي تحدد كيفية إنجاز العمل. يقيس هذا التقييم تجربتك لثقافة بيئة عملك عبر تسعة أبعاد رئيسية.",
     source: "Mindlign Culture Assessment (2026). Mindlign Platform.",
   },
+  PSYCH_SAFETY: {
+    en:     "Psychological safety is the shared belief that team members can speak up, ask questions, or admit mistakes without fear of punishment or humiliation. It is a key driver of team learning and performance.",
+    ar:     "السلامة النفسية هي الاعتقاد المشترك بأن أعضاء الفريق يستطيعون التعبير عن آرائهم أو طرح الأسئلة أو الاعتراف بالأخطاء دون خوف من العقاب أو الإهانة. وهي محرّك رئيسي لتعلم الفريق وأدائه.",
+    source: "Edmondson, A. (1999). Psychological safety and learning behavior in work teams. Administrative Science Quarterly, 44(2), 350–383.",
+  },
+  TURNOVER: {
+    en:     "Turnover intention measures how frequently employees think about leaving their current job or organisation. Higher scores reflect a greater likelihood of departure in the near future.",
+    ar:     "تقيس نية ترك العمل مدى تكرار تفكير الموظفين في مغادرة وظيفتهم أو مؤسستهم الحالية. تعكس الدرجات الأعلى احتمالية أكبر للمغادرة في المستقبل القريب.",
+    source: "Mobley, W. H. (1977). Intermediate linkages in the relationship between job satisfaction and employee turnover. Journal of Applied Psychology, 62(2).",
+  },
+  LMX7: {
+    en:     "Leader-Member Exchange (LMX) theory describes the quality of the relationship between a manager and each of their direct reports. High-quality LMX relationships are characterised by trust, respect, and mutual obligation.",
+    ar:     "تصف نظرية التبادل بين القائد والعضو (LMX) جودة العلاقة بين المدير وكل من مرؤوسيه المباشرين. تتسم علاقات LMX عالية الجودة بالثقة والاحترام والالتزام المتبادل.",
+    source: "Graen, G. B., & Uhl-Bien, M. (1995). Relationship-based approach to leadership: Development of leader-member exchange theory. The Leadership Quarterly, 6(2).",
+  },
 };
 
 // SurveyJS must be loaded client-side only (it accesses window/document)

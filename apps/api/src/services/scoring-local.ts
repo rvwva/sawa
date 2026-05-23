@@ -101,6 +101,55 @@ function scoresCulture(responses: Record<string, number>): ScoringResult {
   };
 }
 
+// ─── Psychological Safety ────────────────────────────────────────────────────
+// 7-point Likert · items 1, 3, 5 are reverse-scored at the choice-value level
+// in SurveyJS, so this function simply sums all raw values.
+
+const PSYCH_SAFETY_ITEMS = ["ps_1", "ps_2", "ps_3", "ps_4", "ps_5", "ps_6", "ps_7"];
+const PSYCH_SAFETY_BANDS: [number, number, string][] = [
+  [0,  49,  "Low"],
+  [50, 74,  "Moderate"],
+  [75, 100, "Healthy"],
+];
+
+function scoresPsychSafety(responses: Record<string, number>): ScoringResult {
+  const raw   = PSYCH_SAFETY_ITEMS.reduce((s, k) => s + (responses[k] ?? 0), 0);
+  const score = round1((raw - 7) / 42 * 100);
+  return { total: { raw_score: raw, score, band: getBand(PSYCH_SAFETY_BANDS, score) } };
+}
+
+// ─── Turnover Intention ──────────────────────────────────────────────────────
+// 5-point frequency scale (1=Never … 5=Always). Higher = worse.
+
+const TURNOVER_ITEMS = ["ti_1", "ti_2", "ti_3"];
+const TURNOVER_BANDS: [number, number, string][] = [
+  [0,  29,  "Good"],
+  [30, 59,  "Moderate"],
+  [60, 100, "High"],
+];
+
+function scoresTurnover(responses: Record<string, number>): ScoringResult {
+  const raw   = TURNOVER_ITEMS.reduce((s, k) => s + (responses[k] ?? 0), 0);
+  const score = round1((raw - 3) / 12 * 100);
+  return { total: { raw_score: raw, score, band: getBand(TURNOVER_BANDS, score) } };
+}
+
+// ─── LMX-7 ──────────────────────────────────────────────────────────────────
+// Mixed per-item response options, all mapped to 1–5.
+
+const LMX7_ITEMS = ["lmx_1", "lmx_2", "lmx_3", "lmx_4", "lmx_5", "lmx_6", "lmx_7"];
+const LMX7_BANDS: [number, number, string][] = [
+  [0,  44,  "Low"],
+  [45, 69,  "Moderate"],
+  [70, 100, "Healthy"],
+];
+
+function scoresLMX7(responses: Record<string, number>): ScoringResult {
+  const raw   = LMX7_ITEMS.reduce((s, k) => s + (responses[k] ?? 0), 0);
+  const score = round1((raw - 7) / 28 * 100);
+  return { total: { raw_score: raw, score, band: getBand(LMX7_BANDS, score) } };
+}
+
 // ─── Public API ─────────────────────────────────────────────────────────────
 
 export function scoreLocal(
@@ -108,9 +157,12 @@ export function scoreLocal(
   responses: Record<string, number>,
 ): ScoringResult {
   switch (assessmentType) {
-    case "WHO5":    return scoresWHO5(responses);
-    case "CBI":     return scoresCBI(responses);
-    case "CULTURE": return scoresCulture(responses);
-    default:        return {};
+    case "WHO5":         return scoresWHO5(responses);
+    case "CBI":          return scoresCBI(responses);
+    case "CULTURE":      return scoresCulture(responses);
+    case "PSYCH_SAFETY": return scoresPsychSafety(responses);
+    case "TURNOVER":     return scoresTurnover(responses);
+    case "LMX7":         return scoresLMX7(responses);
+    default:             return {};
   }
 }
