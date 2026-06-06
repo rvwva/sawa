@@ -336,7 +336,7 @@ export default function ResultsPage() {
               </div>
             )}
 
-            {/* WHO-5: only "total" subscale — show it as a full bar */}
+            {/* Single-subscale assessments: show the total as a standalone bar */}
             {orgSubscales.length === 0 && orgTotal && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <h2 className="font-bold text-gray-900 mb-4">

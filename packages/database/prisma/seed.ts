@@ -5,10 +5,6 @@ import {
   CBI_SCORING_RULES,
 } from "../../scoring/definitions/cbi";
 import {
-  WHO5_SURVEY_SCHEMA,
-  WHO5_SCORING_RULES,
-} from "../../scoring/definitions/who5";
-import {
   CULTURE_SURVEY_SCHEMA,
   CULTURE_SCORING_RULES,
 } from "../../scoring/definitions/culture";
@@ -41,17 +37,6 @@ async function main() {
       itemCount: 19,
       surveySchema: CBI_SURVEY_SCHEMA,
       scoringRules: CBI_SCORING_RULES,
-      version: "1.0",
-    },
-    {
-      type: AssessmentType.WHO5,
-      name: "WHO-5 Wellbeing Index",
-      nameAr: "مؤشر الرفاهية WHO-5",
-      description:
-        "Short, self-reported measure of current mental wellbeing across 5 items.",
-      itemCount: 5,
-      surveySchema: WHO5_SURVEY_SCHEMA,
-      scoringRules: WHO5_SCORING_RULES,
       version: "1.0",
     },
     {

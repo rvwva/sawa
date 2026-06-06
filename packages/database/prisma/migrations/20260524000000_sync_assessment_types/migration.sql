@@ -1,6 +1,21 @@
--- Sync AssessmentType enum with production database state.
--- Production DB retains PSS; this migration only adds the three new scale types.
--- IF NOT EXISTS makes each statement safe to run regardless of current enum state.
-ALTER TYPE "AssessmentType" ADD VALUE IF NOT EXISTS 'PSYCH_SAFETY';
-ALTER TYPE "AssessmentType" ADD VALUE IF NOT EXISTS 'TURNOVER';
-ALTER TYPE "AssessmentType" ADD VALUE IF NOT EXISTS 'LMX7';
+-- Remove PSS and WHO5 from AssessmentType; add PSYCH_SAFETY, TURNOVER, LMX7.
+--
+-- Delete any assessment definition rows for the deprecated types first.
+-- This cascades to any AssessmentCycles and downstream records that reference them.
+DELETE FROM "assessments" WHERE "type"::text IN ('PSS', 'WHO5');
+
+-- PostgreSQL cannot DROP VALUES from an enum, so we recreate the type.
+CREATE TYPE "AssessmentType_new" AS ENUM (
+  'CBI',
+  'CULTURE',
+  'PSYCH_SAFETY',
+  'TURNOVER',
+  'LMX7'
+);
+
+ALTER TABLE "assessments"
+  ALTER COLUMN "type" TYPE "AssessmentType_new"
+  USING "type"::text::"AssessmentType_new";
+
+DROP TYPE "AssessmentType";
+ALTER TYPE "AssessmentType_new" RENAME TO "AssessmentType";

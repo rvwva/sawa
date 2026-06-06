@@ -21,8 +21,6 @@ enum UserRole {
 
 enum AssessmentType {
   CBI          // Copenhagen Burnout Inventory (19 items)
-  PSS          // Perceived Stress Scale — retained to match production DB; removal planned
-  WHO5         // WHO-5 Wellbeing Index (5 items)
   CULTURE      // Proprietary Culture Assessment (40 items)
   PSYCH_SAFETY // Psychological Safety Scale (7 items)
   TURNOVER     // Turnover Intention Scale (3 items)

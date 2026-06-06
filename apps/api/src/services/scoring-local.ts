@@ -11,22 +11,6 @@ function getBand(bands: [number, number, string][], score: number): string {
   return bands.find(([lo, hi]) => score >= lo && score <= hi)?.[2] ?? bands[bands.length - 1][2];
 }
 
-// ─── WHO-5 ──────────────────────────────────────────────────────────────────
-
-const WHO5_ITEMS = Array.from({ length: 5 }, (_, i) => `who5_${i + 1}`);
-const WHO5_BANDS: [number, number, string][] = [
-  [0, 28, "Low"],
-  [29, 50, "Below Average"],
-  [51, 67, "Moderate"],
-  [68, 100, "Good"],
-];
-
-function scoresWHO5(responses: Record<string, number>): ScoringResult {
-  const raw = WHO5_ITEMS.reduce((s, k) => s + (responses[k] ?? 0), 0);
-  const pct = raw * 4;
-  return { total: { raw_score: raw, score: pct, band: getBand(WHO5_BANDS, pct) } };
-}
-
 // ─── CBI ────────────────────────────────────────────────────────────────────
 // Values arrive pre-mapped to 0/25/50/75/100 by SurveyJS.
 // cbi_13 uses DEGREE_CHOICES_REVERSED in SurveyJS — already inverted at the
@@ -157,7 +141,6 @@ export function scoreLocal(
   responses: Record<string, number>,
 ): ScoringResult {
   switch (assessmentType) {
-    case "WHO5":         return scoresWHO5(responses);
     case "CBI":          return scoresCBI(responses);
     case "CULTURE":      return scoresCulture(responses);
     case "PSYCH_SAFETY": return scoresPsychSafety(responses);
