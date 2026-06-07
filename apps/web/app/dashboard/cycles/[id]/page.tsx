@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -8,7 +8,7 @@ import {
 } from "recharts";
 import { API_BASE } from "@/lib/api";
 import { dir, useTranslations, translateBand } from "@/lib/i18n";
-import { useDashLang } from "../../context";
+import { useDashLang, useDashUser } from "../../context";
 import ScoreGauge from "@/components/ui/ScoreGauge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -114,6 +114,15 @@ type DemographicData = {
   nonSaudiCount: number;
   unknownNationalityCount: number;
   saudizationPct: number | null;
+};
+
+type CycleManagement = {
+  id: string;
+  status: string;
+  linkToken: string;
+  recipientEmails: string[] | null;
+  resultsPublishedAt: string | null;
+  reminderSentAt: string | null;
 };
 
 // ─── Label maps ───────────────────────────────────────────────────────────────
@@ -232,6 +241,7 @@ function SubBar({
 export default function CycleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const lang   = useDashLang();
+  const user   = useDashUser();
   const t      = useTranslations(lang);
 
   const [cycleResult,    setCycleResult]    = useState<CycleResult | null>(null);
@@ -239,10 +249,14 @@ export default function CycleDetailPage() {
   const [rateData,       setRateData]       = useState<ResponseRate | null>(null);
   const [trendData,      setTrendData]      = useState<TrendData | null>(null);
   const [demographicData,setDemographicData]= useState<DemographicData | null>(null);
+  const [cycleDetail,    setCycleDetail]    = useState<CycleManagement | null>(null);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState("");
+  const [msg,            setMsg]            = useState<{ text: string; ok: boolean } | null>(null);
+  const [actionBusy,     setActionBusy]     = useState(false);
+  const [copiedLink,     setCopiedLink]     = useState(false);
 
-  useEffect(() => {
+  const loadAll = useCallback(() => {
     const token = localStorage.getItem("mindlign_token");
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
@@ -257,17 +271,50 @@ export default function CycleDetailPage() {
       fetch(`${base}/response-rate`, { headers }).then((r) => r.ok ? r.json() : null),
       fetch(`${base}/trend`, { headers }).then((r) => r.ok ? r.json() : null),
       fetch(`${base}/demographics`, { headers }).then((r) => r.ok ? r.json() : null),
+      fetch(`${API_BASE}/assessments/cycles/${id}`, { headers }).then((r) => r.ok ? r.json() : null),
     ])
-      .then(([cr, dd, rd, td, dem]) => {
+      .then(([cr, dd, rd, td, dem, cd]) => {
         setCycleResult(cr);
         if (dd)  setDeptData(dd);
         if (rd)  setRateData(rd);
         if (td)  setTrendData(td);
         if (dem) setDemographicData(dem);
+        if (cd)  setCycleDetail(cd);
       })
       .catch(() => setError(lang === "ar" ? "تعذّر تحميل بيانات الدورة." : "Failed to load cycle data."))
       .finally(() => setLoading(false));
   }, [id, lang]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  async function doAction(action: "activate" | "remind" | "close" | "publish", confirmMsg: string) {
+    if (!window.confirm(confirmMsg)) return;
+    setActionBusy(true);
+    setMsg(null);
+    try {
+      const token = localStorage.getItem("mindlign_token");
+      const res = await fetch(`${API_BASE}/assessments/cycles/${id}/${action}`, {
+        method:  "PATCH",
+        headers: { Authorization: `Bearer ${token ?? ""}`, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Action failed");
+      setMsg({ text: data.message ?? (lang === "ar" ? "تم." : "Done."), ok: true });
+      loadAll();
+    } catch (err: any) {
+      setMsg({ text: err.message, ok: false });
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  function copyAssessLink() {
+    if (!cycleDetail) return;
+    navigator.clipboard.writeText(`${window.location.origin}/assess/${cycleDetail.linkToken}`).then(() => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    });
+  }
 
   // Poll response rate every 30 s while ACTIVE
   useEffect(() => {
@@ -283,6 +330,8 @@ export default function CycleDetailPage() {
     }, 30_000);
     return () => clearInterval(iv);
   }, [cycleResult?.status, id]);
+
+  const canManage = user?.role === "ADMIN" || user?.role === "EXECUTIVE";
 
   if (loading) {
     return (
@@ -383,6 +432,90 @@ export default function CycleDetailPage() {
           </span>
         </div>
       </div>
+
+      {/* ── Management panel ── */}
+      {canManage && cycleDetail && (
+        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+          {/* Toast */}
+          {msg && (
+            <div className={[
+              "flex items-center gap-3 rounded-xl px-4 py-3 text-sm",
+              msg.ok
+                ? "bg-green-50 border border-green-200 text-green-700"
+                : "bg-red-50 border border-red-200 text-red-700",
+            ].join(" ")}>
+              <span>{msg.ok ? "✓" : "✕"}</span>
+              <span className="flex-1">{msg.text}</span>
+              <button onClick={() => setMsg(null)} className="opacity-60 hover:opacity-100">✕</button>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Assessment link — show while DRAFT or ACTIVE */}
+            {(cycleDetail.status === "DRAFT" || cycleDetail.status === "ACTIVE") && (
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <code className="flex-1 min-w-0 truncate bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-500 font-mono">
+                  {typeof window !== "undefined" ? `${window.location.origin}/assess/${cycleDetail.linkToken}` : `/assess/${cycleDetail.linkToken}`}
+                </code>
+                <button
+                  onClick={copyAssessLink}
+                  className="shrink-0 px-3 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200 transition-colors"
+                >
+                  {copiedLink ? t("copied") : t("copy")}
+                </button>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-2 shrink-0">
+              {cycleDetail.status === "DRAFT" && (
+                <button
+                  disabled={actionBusy}
+                  onClick={() => doAction("activate", lang === "ar" ? "تفعيل هذه الدورة وإرسال الدعوات؟" : "Activate this cycle and send invitations?")}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-60 transition-colors"
+                >
+                  {t("admin_act_activate")}
+                </button>
+              )}
+              {cycleDetail.status === "ACTIVE" && (cycleDetail.recipientEmails?.length ?? 0) > 0 && (
+                <button
+                  disabled={actionBusy}
+                  onClick={() => doAction("remind", t("admin_act_remind_confirm"))}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                >
+                  {t("admin_act_remind")}
+                </button>
+              )}
+              {cycleDetail.status === "ACTIVE" && (
+                <button
+                  disabled={actionBusy}
+                  onClick={() => doAction("close", t("admin_act_close_confirm"))}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60 transition-colors"
+                >
+                  {t("admin_act_close")}
+                </button>
+              )}
+              {cycleDetail.status === "CLOSED" && !cycleDetail.resultsPublishedAt && (
+                <button
+                  disabled={actionBusy}
+                  onClick={() => doAction("publish", lang === "ar" ? "نشر النتائج للمشاركين؟" : "Publish results to all participants?")}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-60 transition-colors"
+                >
+                  {t("admin_act_publish")}
+                </button>
+              )}
+              {cycleDetail.resultsPublishedAt && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-50 text-green-700 text-sm font-semibold border border-green-200">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  {lang === "ar" ? "النتائج منشورة" : "Results published"}
+                </span>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Risk flag ── */}
       {riskDrop !== null && (

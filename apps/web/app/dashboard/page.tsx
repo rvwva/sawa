@@ -278,8 +278,7 @@ export default function DashboardOverviewPage() {
     );
   }
 
-  const canView = (status: string) =>
-    status === "ACTIVE" || status === "CLOSED" || status === "ARCHIVED";
+  const canView = (_status: string) => true;
 
   return (
     <div dir={dir(lang)} className="max-w-6xl mx-auto space-y-8">
