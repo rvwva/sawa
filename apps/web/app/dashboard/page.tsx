@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { API_BASE } from "@/lib/api";
 import { dir, useTranslations, Lang } from "@/lib/i18n";
@@ -89,52 +89,182 @@ function StatCard({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+// ─── New-cycle modal ──────────────────────────────────────────────────────────
+
+const ASSESSMENT_TYPES = ["CBI", "CULTURE", "PSYCH_SAFETY", "TURNOVER", "LMX7"] as const;
+
+function NewCycleModal({
+  lang,
+  onClose,
+  onCreated,
+}: {
+  lang: Lang;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const t = useTranslations(lang);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const [form, setForm] = useState({
+    assessmentType: "CBI",
+    title: "",
+    startsAt: "",
+    endsAt: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr("");
+    setSubmitting(true);
+    try {
+      const token = localStorage.getItem("mindlign_token");
+      const res = await fetch(`${API_BASE}/assessments/cycles`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setErr(body.error ?? (lang === "ar" ? "فشل الإنشاء" : "Failed to create cycle"));
+        return;
+      }
+      onCreated();
+    } catch {
+      setErr(lang === "ar" ? "خطأ في الشبكة" : "Network error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-900">{t("admin_new_cycle")}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          {err && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-700 text-sm">{err}</div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin_cycle_type")}</label>
+            <select
+              value={form.assessmentType}
+              onChange={(e) => setForm((f) => ({ ...f, assessmentType: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            >
+              {ASSESSMENT_TYPES.map((type) => (
+                <option key={type} value={type}>{type.replace("_", " ")}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin_cycle_title_f")}</label>
+            <input
+              type="text"
+              required
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder={lang === "ar" ? "مثال: دورة Q3 2026" : "e.g. Q3 2026 Cycle"}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin_cycle_starts")}</label>
+              <input
+                type="date"
+                required
+                value={form.startsAt}
+                onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin_cycle_ends")}</label>
+              <input
+                type="date"
+                required
+                value={form.endsAt}
+                onChange={(e) => setForm((f) => ({ ...f, endsAt: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              {lang === "ar" ? "إلغاء" : "Cancel"}
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-60 transition-colors"
+            >
+              {submitting ? (lang === "ar" ? "جاري الإنشاء…" : "Creating…") : t("admin_create_cycle")}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function DashboardOverviewPage() {
   const lang = useDashLang();
   const user = useDashUser();
   const t    = useTranslations(lang);
 
-  const [stats, setStats]     = useState<DashStats | null>(null);
-  const [cycles, setCycles]   = useState<Cycle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState("");
+  const [stats, setStats]         = useState<DashStats | null>(null);
+  const [cycles, setCycles]       = useState<Cycle[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState("");
+  const [showNewCycle, setShowNewCycle] = useState(false);
+
+  const loadData = (orgId: string, token: string) => {
+    const headers = { Authorization: `Bearer ${token}` };
+    setLoading(true);
+    setError("");
+    Promise.all([
+      fetch(`${API_BASE}/reports/dashboard/${orgId}`, { headers }).then(
+        (r) => (r.ok ? r.json() : null)
+      ),
+      fetch(`${API_BASE}/assessments/cycles?organisationId=${orgId}`, { headers }).then(
+        (r) => (r.ok ? r.json() : [])
+      ),
+    ])
+      .then(([s, c]) => {
+        if (s) setStats(s);
+        const list: Cycle[] = Array.isArray(c) ? c : [];
+        list.sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
+        setCycles(list);
+      })
+      .catch(() => {
+        setError(lang === "ar" ? "تعذّر تحميل بيانات لوحة التحكم." : "Failed to load dashboard data.");
+      })
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     if (!user) return;
     const token = localStorage.getItem("mindlign_token");
     if (!token) return;
-    const headers = { Authorization: `Bearer ${token}` };
-
-    setLoading(true);
-    setError("");
-
-    Promise.all([
-      fetch(`${API_BASE}/reports/dashboard/${user.organisationId}`, { headers }).then(
-        (r) => (r.ok ? r.json() : null)
-      ),
-      fetch(
-        `${API_BASE}/assessments/cycles?organisationId=${user.organisationId}`,
-        { headers }
-      ).then((r) => (r.ok ? r.json() : [])),
-    ])
-      .then(([s, c]) => {
-        if (s) setStats(s);
-        const list: Cycle[] = Array.isArray(c) ? c : [];
-        // Sort: ACTIVE → CLOSED → ARCHIVED → DRAFT
-        list.sort(
-          (a, b) =>
-            (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99)
-        );
-        setCycles(list);
-      })
-      .catch(() => {
-        setError(
-          lang === "ar"
-            ? "تعذّر تحميل بيانات لوحة التحكم."
-            : "Failed to load dashboard data."
-        );
-      })
-      .finally(() => setLoading(false));
+    loadData(user.organisationId, token);
   }, [user, lang]);
 
   if (loading || !user) {
@@ -155,12 +285,35 @@ export default function DashboardOverviewPage() {
     <div dir={dir(lang)} className="max-w-6xl mx-auto space-y-8">
 
       {/* ── Page heading ── */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">{t("exec_title")}</h1>
-        <p className="text-gray-500 mt-1">
-          {t("exec_welcome")}, {user.firstName}.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{t("exec_title")}</h1>
+          <p className="text-gray-500 mt-1">
+            {t("exec_welcome")}, {user.firstName}.
+          </p>
+        </div>
+        {(user.role === "ADMIN" || user.role === "EXECUTIVE") && (
+          <button
+            onClick={() => setShowNewCycle(true)}
+            className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition-colors shadow-sm"
+          >
+            {t("exec_new_cycle")}
+          </button>
+        )}
       </div>
+
+      {/* ── New Cycle modal ── */}
+      {showNewCycle && (
+        <NewCycleModal
+          lang={lang}
+          onClose={() => setShowNewCycle(false)}
+          onCreated={() => {
+            setShowNewCycle(false);
+            const token = localStorage.getItem("mindlign_token");
+            if (token && user) loadData(user.organisationId, token);
+          }}
+        />
+      )}
 
       {/* ── Error ── */}
       {error && (
@@ -196,9 +349,17 @@ export default function DashboardOverviewPage() {
         </h2>
 
         {cycles.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center space-y-2">
+          <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center space-y-3">
             <p className="text-gray-500">{t("cycle_no_cycles")}</p>
             <p className="text-sm text-gray-400">{t("cycle_create_first")}</p>
+            {(user.role === "ADMIN" || user.role === "EXECUTIVE") && (
+              <button
+                onClick={() => setShowNewCycle(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition-colors mt-2"
+              >
+                {t("exec_new_cycle")}
+              </button>
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
