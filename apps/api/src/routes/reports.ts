@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { requireRole, requireOrgAccess } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
-import { AuditAction } from "@prisma/client";
+import { AuditAction, AssessmentType } from "@prisma/client";
 
 export const reportsRouter = Router();
 
@@ -135,7 +135,9 @@ reportsRouter.get(
     try {
       const { organisationId } = req.params;
 
-      const [totalCycles, activeCycles, totalRespondents, totalEnrolled, cycleAssessments] =
+      const ACTIVE_TYPES = new Set(["CBI", "CULTURE", "PSYCH_SAFETY", "TURNOVER", "LMX7"]);
+
+      const [totalCycles, activeCycles, totalRespondents, totalEnrolled, cycleTypeRows] =
         await Promise.all([
           prisma.assessmentCycle.count({ where: { organisationId } }),
           prisma.assessmentCycle.count({ where: { organisationId, status: "ACTIVE" } }),
@@ -145,10 +147,15 @@ reportsRouter.get(
           prisma.respondent.count({
             where: { cycle: { organisationId, status: { not: "DRAFT" } } },
           }),
-          prisma.assessmentCycle.findMany({
-            where: { organisationId, status: { not: "ARCHIVED" } },
-            select: { assessment: { select: { type: true } } },
-          }),
+          // Use raw SQL so we get type as plain text — avoids Prisma enum-validation
+          // errors if the DB still contains a legacy value (PSS / WHO5) before migration.
+          prisma.$queryRaw<{ type: string }[]>`
+            SELECT DISTINCT a.type::text AS type
+            FROM   assessment_cycles ac
+            JOIN   assessments a ON a.id = ac.assessment_id
+            WHERE  ac.organisation_id = ${organisationId}
+              AND  ac.status != 'ARCHIVED'
+          `,
         ]);
 
       // Participation rate — always meaningful regardless of assessment mix
@@ -157,8 +164,8 @@ reportsRouter.get(
           ? Math.round((totalRespondents / totalEnrolled) * 1000) / 10
           : null;
 
-      // Average score — only meaningful when all non-archived cycles share one type
-      const distinctTypes = [...new Set(cycleAssessments.map((c) => c.assessment.type))];
+      // Average score — only meaningful when all non-archived cycles share one known type
+      const distinctTypes = cycleTypeRows.map((r) => r.type).filter((t) => ACTIVE_TYPES.has(t));
       const singleType = distinctTypes.length === 1 ? distinctTypes[0] : null;
 
       let avgScore: number | null = null;
@@ -168,7 +175,7 @@ reportsRouter.get(
         const scores = await prisma.score.findMany({
           where: {
             respondent: {
-              cycle: { organisationId, assessment: { type: singleType as any } },
+              cycle: { organisationId, assessment: { type: singleType as AssessmentType } },
               submittedAt: { not: null },
             },
             subscale: "total",
