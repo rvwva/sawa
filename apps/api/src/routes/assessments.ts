@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
-import { AuditAction } from "@prisma/client";
+import { AuditAction, Prisma } from "@prisma/client";
 import { aggregateCycleScores, aggregateDepartmentScores, buildCycleSummary } from "../services/scoring";
 import {
   sendCycleClosedNotification,
@@ -18,26 +18,32 @@ export const assessmentsRouter = Router();
 
 // ─── GET /api/assessments — list all assessment types ─────────────────────────
 
-assessmentsRouter.get("/", requireAuth, async (_req: Request, res: Response) => {
-  const assessments = await prisma.assessment.findMany({
-    select: {
-      id: true, type: true, name: true, nameAr: true,
-      description: true, itemCount: true, version: true,
-    },
-    orderBy: { type: "asc" },
-  });
-  return res.json(assessments);
+assessmentsRouter.get("/", requireAuth, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const assessments = await prisma.$queryRaw<Array<{
+      id: string; type: string; name: string; nameAr: string | null;
+      description: string | null; itemCount: number; version: string;
+    }>>`
+      SELECT id, type::text AS type, name, name_ar AS "nameAr",
+             description, item_count AS "itemCount", version
+      FROM   assessments
+      ORDER  BY type
+    `;
+    return res.json(assessments);
+  } catch (err) { next(err); }
 });
 
 // ─── GET /api/assessments/:type/schema ────────────────────────────────────────
 
-assessmentsRouter.get("/:type/schema", async (req: Request, res: Response) => {
-  const assessment = await prisma.assessment.findUnique({
-    where: { type: req.params.type.toUpperCase() as any },
-    select: { id: true, type: true, name: true, nameAr: true, surveySchema: true },
-  });
-  if (!assessment) return res.status(404).json({ error: "Assessment type not found" });
-  return res.json(assessment);
+assessmentsRouter.get("/:type/schema", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const assessment = await prisma.assessment.findUnique({
+      where: { type: req.params.type.toUpperCase() as any },
+      select: { id: true, type: true, name: true, nameAr: true, surveySchema: true },
+    });
+    if (!assessment) return res.status(404).json({ error: "Assessment type not found" });
+    return res.json(assessment);
+  } catch (err) { next(err); }
 });
 
 // ─── POST /api/assessments/cycles — create cycle ──────────────────────────────
@@ -52,34 +58,36 @@ assessmentsRouter.post(
     body("startsAt").isISO8601(),
     body("endsAt").isISO8601(),
   ],
-  async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { organisationId, assessmentType, title, startsAt, endsAt } = req.body;
-    const targetOrgId =
-      req.user!.role === "ADMIN" ? organisationId : req.user!.organisationId;
-    if (!targetOrgId) return res.status(400).json({ error: "Organisation ID required" });
+      const { organisationId, assessmentType, title, startsAt, endsAt } = req.body;
+      const targetOrgId =
+        req.user!.role === "ADMIN" ? organisationId : req.user!.organisationId;
+      if (!targetOrgId) return res.status(400).json({ error: "Organisation ID required" });
 
-    const assessment = await prisma.assessment.findUnique({ where: { type: assessmentType } });
-    if (!assessment) return res.status(400).json({ error: "Invalid assessment type" });
+      const assessment = await prisma.assessment.findUnique({ where: { type: assessmentType } });
+      if (!assessment) return res.status(400).json({ error: "Invalid assessment type" });
 
-    const cycle = await prisma.assessmentCycle.create({
-      data: {
-        organisationId: targetOrgId,
-        assessmentId:   assessment.id,
-        title,
-        startsAt: new Date(startsAt),
-        endsAt:   new Date(endsAt),
-        status:   "DRAFT",
-      },
-    });
+      const cycle = await prisma.assessmentCycle.create({
+        data: {
+          organisationId: targetOrgId,
+          assessmentId:   assessment.id,
+          title,
+          startsAt: new Date(startsAt),
+          endsAt:   new Date(endsAt),
+          status:   "DRAFT",
+        },
+      });
 
-    await auditLog(AuditAction.CYCLE_CREATED, {
-      userId: req.user!.userId, entityType: "AssessmentCycle", entityId: cycle.id, req,
-    });
+      await auditLog(AuditAction.CYCLE_CREATED, {
+        userId: req.user!.userId, entityType: "AssessmentCycle", entityId: cycle.id, req,
+      });
 
-    return res.status(201).json(cycle);
+      return res.status(201).json(cycle);
+    } catch (err) { next(err); }
   }
 );
 
@@ -89,21 +97,40 @@ assessmentsRouter.get(
   "/cycles",
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
-  async (req: Request, res: Response) => {
-    const orgId =
-      req.user!.role === "ADMIN"
-        ? (req.query.organisationId as string)
-        : req.user!.organisationId;
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId =
+        req.user!.role === "ADMIN"
+          ? (req.query.organisationId as string)
+          : req.user!.organisationId;
 
-    const cycles = await prisma.assessmentCycle.findMany({
-      where: { organisationId: orgId ?? undefined },
-      include: {
-        assessment: { select: { type: true, name: true } },
-        _count:     { select: { respondents: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    return res.json(cycles);
+      const cycles = await prisma.assessmentCycle.findMany({
+        where: { organisationId: orgId ?? undefined },
+        include: {
+          assessment: { select: { name: true } },
+          _count:     { select: { respondents: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      // Fetch assessment types as plain text — avoids Prisma enum deserialization
+      // errors if the DB still contains a legacy type (PSS / WHO5).
+      const assessmentIds = [...new Set(cycles.map((c) => c.assessmentId))];
+      const typeMap = new Map<string, string>();
+      if (assessmentIds.length > 0) {
+        const rows = await prisma.$queryRaw<{ id: string; type: string }[]>(
+          Prisma.sql`SELECT id, type::text AS type FROM assessments WHERE id IN (${Prisma.join(assessmentIds)})`
+        );
+        rows.forEach((r) => typeMap.set(r.id, r.type));
+      }
+
+      return res.json(
+        cycles.map((c) => ({
+          ...c,
+          assessment: { name: c.assessment.name, type: typeMap.get(c.assessmentId) ?? null },
+        }))
+      );
+    } catch (err) { next(err); }
   }
 );
 
@@ -114,10 +141,11 @@ assessmentsRouter.patch(
   "/cycles/:id/activate",
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
     const cycle = await prisma.assessmentCycle.findUnique({
       where:   { id: req.params.id },
-      include: { assessment: true, organisation: true },
+      include: { assessment: { select: { name: true, nameAr: true } }, organisation: true },
     });
     if (!cycle) return res.status(404).json({ error: "Cycle not found" });
 
@@ -214,6 +242,7 @@ assessmentsRouter.patch(
     }
 
     return res.json(updated);
+    } catch (err) { next(err); }
   }
 );
 
@@ -284,10 +313,11 @@ assessmentsRouter.patch(
   "/cycles/:id/close",
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
     const cycle = await prisma.assessmentCycle.findUnique({
       where:   { id: req.params.id },
-      include: { assessment: true, organisation: true },
+      include: { assessment: { select: { name: true, nameAr: true } }, organisation: true },
     });
     if (!cycle) return res.status(404).json({ error: "Cycle not found" });
 
@@ -362,6 +392,7 @@ assessmentsRouter.patch(
     }
 
     return res.json({ message: "Cycle closed successfully", cycleId: cycle.id, respondentCount });
+    } catch (err) { next(err); }
   }
 );
 
@@ -372,10 +403,11 @@ assessmentsRouter.patch(
   "/cycles/:id/publish",
   requireAuth,
   requireRole("ADMIN", "EXECUTIVE"),
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
     const cycle = await prisma.assessmentCycle.findUnique({
       where:   { id: req.params.id },
-      include: { assessment: true, organisation: true },
+      include: { assessment: { select: { name: true, nameAr: true } }, organisation: true },
     });
     if (!cycle) return res.status(404).json({ error: "Cycle not found" });
 
@@ -447,6 +479,7 @@ assessmentsRouter.patch(
       cycleId:    cycle.id,
       recipients: emails.length,
     });
+    } catch (err) { next(err); }
   }
 );
 
@@ -454,10 +487,12 @@ assessmentsRouter.patch(
 
 assessmentsRouter.get(
   "/cycles/by-token/:token",
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
     const cycleInclude = {
       assessment: {
-        select: { type: true, name: true, nameAr: true, description: true, itemCount: true },
+        // type excluded — fetched via $queryRaw below to avoid enum deserialization errors
+        select: { name: true, nameAr: true, description: true, itemCount: true },
       },
       organisation: {
         select: {
@@ -492,16 +527,22 @@ assessmentsRouter.get(
     if (cycle.status !== "ACTIVE") return res.status(410).json({ error: "This assessment is no longer active" });
     if (new Date() > cycle.endsAt) return res.status(410).json({ error: "This assessment has expired" });
 
+    // Fetch type as plain text to bypass Prisma enum validation
+    const [typeRow] = await prisma.$queryRaw<{ type: string }[]>`
+      SELECT type::text AS type FROM assessments WHERE id = ${cycle.assessmentId}
+    `;
+
     const { departments, ...org } = cycle.organisation;
     return res.json({
       cycleId:      cycle.id,
       title:        cycle.title,
       endsAt:       cycle.endsAt,
-      assessment:   cycle.assessment,
+      assessment:   { ...cycle.assessment, type: typeRow?.type ?? null },
       organisation: org,
       departments,
       ...(departmentLinkToken ? { departmentLinkToken } : {}),
     });
+    } catch (err) { next(err); }
   }
 );
 
