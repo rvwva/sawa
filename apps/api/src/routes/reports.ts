@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { requireRole, requireOrgAccess } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
-import { AuditAction, AssessmentType } from "@prisma/client";
+import { AuditAction, AssessmentType, Prisma } from "@prisma/client";
 
 export const reportsRouter = Router();
 
@@ -25,6 +25,7 @@ reportsRouter.get(
         orderBy: { createdAt: "desc" },
         select: {
           id: true,
+          cycleId: true, // used for type lookup below, stripped from response
           type: true,
           periodStart: true,
           periodEnd: true,
@@ -32,12 +33,35 @@ reportsRouter.get(
           generatedAt: true,
           createdAt: true,
           cycle: {
-            select: { title: true, assessment: { select: { type: true, name: true } } },
+            select: { title: true, assessment: { select: { name: true } } },
           },
         },
       });
 
-      return res.json(reports);
+      // Fetch assessment types as plain text for all non-null cycles
+      const cycleIds = reports.map((r) => r.cycleId).filter((id): id is string => id !== null);
+      const cycleTypeMap = new Map<string, string>();
+      if (cycleIds.length > 0) {
+        const typeRows = await prisma.$queryRaw<{ cycleId: string; type: string }[]>(
+          Prisma.sql`
+            SELECT ac.id AS "cycleId", a.type::text AS type
+            FROM   assessment_cycles ac
+            JOIN   assessments a ON a.id = ac.assessment_id
+            WHERE  ac.id IN (${Prisma.join(cycleIds)})
+          `
+        );
+        typeRows.forEach((r) => cycleTypeMap.set(r.cycleId, r.type));
+      }
+
+      // Strip cycleId from top-level and merge type into nested assessment
+      return res.json(
+        reports.map(({ cycleId: _cid, ...r }) => ({
+          ...r,
+          cycle: r.cycle
+            ? { ...r.cycle, assessment: { ...r.cycle.assessment, type: cycleTypeMap.get(_cid!) ?? null } }
+            : null,
+        }))
+      );
     } catch (err) { next(err); }
   }
 );
@@ -55,7 +79,7 @@ reportsRouter.get(
           organisation: { select: { name: true } },
           cycle: {
             include: {
-              assessment: { select: { type: true, name: true } },
+              assessment: { select: { name: true } }, // type via $queryRaw
               respondents: {
                 where: { submittedAt: { not: null } },
                 include: { scores: true, department: { select: { name: true } } },
@@ -71,6 +95,16 @@ reportsRouter.get(
         report.organisationId !== req.user!.organisationId
       ) {
         return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Fetch assessment type as plain text if the report has a cycle
+      let summaryAssessmentType: string | null = null;
+      if (report.cycle) {
+        const [sumTypeRow] = await prisma.$queryRaw<{ type: string }[]>`
+          SELECT type::text AS type FROM assessments WHERE id = ${report.cycle.assessmentId}
+        `;
+        summaryAssessmentType = sumTypeRow?.type ?? null;
+        (report.cycle as any).assessment = { ...report.cycle.assessment, type: summaryAssessmentType };
       }
 
       await auditLog(AuditAction.REPORT_GENERATED, {

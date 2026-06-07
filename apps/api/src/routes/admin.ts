@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
-import { AuditAction } from "@prisma/client";
+import { AuditAction, Prisma } from "@prisma/client";
 
 export const adminRouter = Router();
 
@@ -86,7 +86,7 @@ adminRouter.get(
           },
           cycles: {
             include: {
-              assessment: { select: { type: true, name: true, nameAr: true } },
+              assessment: { select: { name: true, nameAr: true } }, // type via $queryRaw
               _count: { select: { respondents: true } },
             },
             orderBy: { createdAt: "desc" },
@@ -94,7 +94,24 @@ adminRouter.get(
         },
       });
       if (!org) return res.status(404).json({ error: "Organisation not found" });
-      return res.json(org);
+
+      // Fetch assessment types as plain text for all cycles in this org
+      const cycleAssessmentIds = [...new Set(org.cycles.map((c) => c.assessmentId))];
+      const orgTypeMap = new Map<string, string>();
+      if (cycleAssessmentIds.length > 0) {
+        const typeRows = await prisma.$queryRaw<{ id: string; type: string }[]>(
+          Prisma.sql`SELECT id, type::text AS type FROM assessments WHERE id IN (${Prisma.join(cycleAssessmentIds)})`
+        );
+        typeRows.forEach((r) => orgTypeMap.set(r.id, r.type));
+      }
+
+      return res.json({
+        ...org,
+        cycles: org.cycles.map((c) => ({
+          ...c,
+          assessment: { ...c.assessment, type: orgTypeMap.get(c.assessmentId) ?? null },
+        })),
+      });
     } catch (err) {
       next(err);
     }

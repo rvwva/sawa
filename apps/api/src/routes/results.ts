@@ -37,7 +37,7 @@ async function resolveCycle(cycleId: string, req: Request, res: Response) {
   const cycle = await prisma.assessmentCycle.findUnique({
     where: { id: cycleId },
     include: {
-      assessment: { select: { type: true, name: true, nameAr: true } },
+      assessment: { select: { name: true, nameAr: true } }, // type via $queryRaw
       organisation: { select: { id: true, name: true } },
       _count: { select: { respondents: true } },
     },
@@ -56,7 +56,11 @@ async function resolveCycle(cycleId: string, req: Request, res: Response) {
     return null;
   }
 
-  return cycle;
+  // Fetch type as plain text to bypass Prisma enum deserialization errors
+  const [typeRow] = await prisma.$queryRaw<{ type: string }[]>`
+    SELECT type::text AS type FROM assessments WHERE id = ${cycle.assessmentId}
+  `;
+  return { ...cycle, assessment: { ...cycle.assessment, type: typeRow?.type ?? null } } as any;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

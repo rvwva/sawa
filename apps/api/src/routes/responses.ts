@@ -56,7 +56,7 @@ responsesRouter.post(
       // Try direct cycle linkToken first (regular link), then resolve via dept link token
       let cycle = await prisma.assessmentCycle.findUnique({
         where: { linkToken: cycleToken },
-        include: { assessment: true },
+        include: { assessment: { select: { name: true } } },
       });
       let resolvedDeptName: string | null = null;
 
@@ -66,7 +66,7 @@ responsesRouter.post(
         logger.info("submit: cycle not found by linkToken, trying dept link", { lookupToken });
         const deptLink = await prisma.cycleDepartmentLink.findUnique({
           where:   { token: lookupToken },
-          include: { cycle: { include: { assessment: true } } },
+          include: { cycle: { include: { assessment: { select: { name: true } } } } },
         });
         if (deptLink) {
           cycle = deptLink.cycle;
@@ -83,6 +83,12 @@ responsesRouter.post(
       if (!cycle) return res.status(404).json({ error: "Assessment link not found" });
       if (cycle.status !== "ACTIVE") return res.status(410).json({ error: "Assessment not active" });
       if (new Date() > cycle.endsAt) return res.status(410).json({ error: "Assessment expired" });
+
+      // Fetch assessment type as plain text — avoids Prisma enum deserialization errors
+      const [submitTypeRow] = await prisma.$queryRaw<{ type: string }[]>`
+        SELECT type::text AS type FROM assessments WHERE id = ${cycle.assessmentId}
+      `;
+      const assessmentTypeStr = submitTypeRow?.type ?? "";
 
       // Resolve departmentId: explicit selector > dept link name > nothing
       let resolvedDeptId: string | null = departmentId ?? null;
@@ -147,7 +153,7 @@ responsesRouter.post(
       );
       await prisma.response.createMany({ data: responseRows });
 
-      const assessmentType = cycle.assessment.type;
+      const assessmentType = assessmentTypeStr;
       const scoringRoute = ASSESSMENT_ROUTE[assessmentType];
 
       let scoringResult: Record<string, any> = {};
@@ -209,7 +215,7 @@ responsesRouter.get("/my-score/:sessionToken", async (req: Request, res: Respons
         scores: true,
         cycle: {
           include: {
-            assessment: { select: { type: true, name: true } },
+            assessment: { select: { name: true } }, // type fetched via $queryRaw
             organisation: { select: { name: true } },
           },
         },
@@ -217,6 +223,10 @@ responsesRouter.get("/my-score/:sessionToken", async (req: Request, res: Respons
     });
 
     if (!respondent) return res.status(404).json({ error: "Session not found" });
+
+    const [myScoreTypeRow] = await prisma.$queryRaw<{ type: string }[]>`
+      SELECT type::text AS type FROM assessments WHERE id = ${respondent.cycle.assessmentId}
+    `;
 
     let deptAvg: Record<string, any> | null = null;
     if (respondent.departmentId) {
@@ -231,7 +241,7 @@ responsesRouter.get("/my-score/:sessionToken", async (req: Request, res: Respons
     const orgAvg = await computeGroupAverage(respondent.cycleId, null);
 
     return res.json({
-      assessment: respondent.cycle.assessment,
+      assessment: { ...respondent.cycle.assessment, type: myScoreTypeRow?.type ?? null },
       submittedAt: respondent.submittedAt,
       myScores: respondent.scores,
       orgAverage: orgAvg,

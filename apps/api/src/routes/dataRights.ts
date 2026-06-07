@@ -17,17 +17,21 @@ dataRightsRouter.post("/access", async (req: Request, res: Response, next: NextF
       include: {
         responses: true,
         scores: true,
-        cycle: { include: { assessment: { select: { type: true, name: true } } } },
+        cycle: { include: { assessment: { select: { name: true } } } }, // type via $queryRaw
       },
     });
 
     if (!respondent) return res.status(404).json({ error: "Session not found" });
 
+    const [drTypeRow] = await prisma.$queryRaw<{ type: string }[]>`
+      SELECT type::text AS type FROM assessments WHERE id = ${respondent.cycle.assessmentId}
+    `;
+
     return res.json({
       submittedAt: respondent.submittedAt,
       consentAt: respondent.consentAt,
       consentVersion: respondent.consentVersion,
-      assessment: respondent.cycle.assessment,
+      assessment: { ...respondent.cycle.assessment, type: drTypeRow?.type ?? null },
       responses: respondent.responses,
       scores: respondent.scores,
     });

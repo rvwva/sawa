@@ -37,10 +37,14 @@ assessmentsRouter.get("/", requireAuth, async (_req: Request, res: Response, nex
 
 assessmentsRouter.get("/:type/schema", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const assessment = await prisma.assessment.findUnique({
-      where: { type: req.params.type.toUpperCase() as any },
-      select: { id: true, type: true, name: true, nameAr: true, surveySchema: true },
-    });
+    const [assessment] = await prisma.$queryRaw<Array<{
+      id: string; type: string; name: string; nameAr: string | null; surveySchema: any;
+    }>>`
+      SELECT id, type::text AS type, name, name_ar AS "nameAr",
+             survey_schema AS "surveySchema"
+      FROM   assessments
+      WHERE  type::text = ${req.params.type.toUpperCase()}
+    `;
     if (!assessment) return res.status(404).json({ error: "Assessment type not found" });
     return res.json(assessment);
   } catch (err) { next(err); }
@@ -260,7 +264,7 @@ assessmentsRouter.patch(
 
       const cycle = await prisma.assessmentCycle.findUnique({
         where:   { id: req.params.id },
-        include: { assessment: true, organisation: true },
+        include: { assessment: { select: { name: true, nameAr: true } }, organisation: true },
       });
       if (!cycle)                 return res.status(404).json({ error: "Cycle not found" });
       if (cycle.status !== "ACTIVE") return res.status(409).json({ error: "Only ACTIVE cycles can send reminders" });
@@ -556,7 +560,7 @@ assessmentsRouter.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const cycleInclude = {
-        assessment:   { select: { type: true, name: true, nameAr: true } },
+        assessment:   { select: { name: true, nameAr: true } }, // type fetched via $queryRaw
         organisation: { select: { name: true, nameAr: true, logoUrl: true } },
       };
 
@@ -582,6 +586,11 @@ assessmentsRouter.get(
       if (!cycle.resultsPublishedAt)
         return res.status(403).json({ error: "Results have not been published yet" });
 
+      // Fetch type as plain text to bypass Prisma enum deserialization
+      const [typeRow] = await prisma.$queryRaw<{ type: string }[]>`
+        SELECT type::text AS type FROM assessments WHERE id = ${cycle.assessmentId}
+      `;
+
       const [orgAgg, deptAggs] = await Promise.all([
         aggregateCycleScores(cycle.id),
         aggregateDepartmentScores(cycle.id),
@@ -595,7 +604,7 @@ assessmentsRouter.get(
       return res.json({
         cycleId:            cycle.id,
         cycleTitle:         cycle.title,
-        assessmentType:     cycle.assessment.type,
+        assessmentType:     typeRow?.type ?? null,
         assessmentName:     cycle.assessment.name,
         assessmentNameAr:   cycle.assessment.nameAr,
         organisationName:   cycle.organisation.name,
@@ -649,7 +658,7 @@ assessmentsRouter.get(
       const cycle = await prisma.assessmentCycle.findUnique({
         where: { id: req.params.id },
         include: {
-          assessment:      { select: { type: true, name: true, nameAr: true } },
+          assessment:      { select: { name: true, nameAr: true } }, // type via $queryRaw
           organisation:    { select: { id: true, name: true, nameAr: true } },
           departmentLinks: { select: { id: true, departmentName: true, token: true, resultsToken: true }, orderBy: { departmentName: "asc" } },
           _count:          { select: { respondents: true } },
@@ -658,7 +667,10 @@ assessmentsRouter.get(
       if (!cycle) return res.status(404).json({ error: "Cycle not found" });
       if (req.user!.role === "EXECUTIVE" && cycle.organisationId !== req.user!.organisationId)
         return res.status(403).json({ error: "Access denied" });
-      return res.json(cycle);
+      const [cycleTypeRow] = await prisma.$queryRaw<{ type: string }[]>`
+        SELECT type::text AS type FROM assessments WHERE id = ${cycle.assessmentId}
+      `;
+      return res.json({ ...cycle, assessment: { ...cycle.assessment, type: cycleTypeRow?.type ?? null } });
     } catch (err) {
       next(err);
     }
