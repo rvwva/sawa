@@ -29,13 +29,20 @@ DELETE FROM "assessments" WHERE "type"::text IN ('PSS', 'WHO5');
 
 -- Step 4: Recreate the enum only if PSS or WHO5 are still present.
 -- PostgreSQL cannot DROP VALUES from an enum, so we use the type-swap pattern.
+--
+-- Safety note: the lookup uses a pg_type JOIN instead of ::regtype so the
+-- check is safe even if AssessmentType doesn't exist — it returns no rows
+-- rather than throwing "type does not exist".
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
-    FROM   pg_enum
-    WHERE  enumtypid = 'public."AssessmentType"'::regtype
-      AND  enumlabel IN ('PSS', 'WHO5')
+    FROM   pg_enum      e
+    JOIN   pg_type      t ON t.oid     = e.enumtypid
+    JOIN   pg_namespace n ON n.oid     = t.typnamespace
+    WHERE  t.typname  = 'AssessmentType'
+      AND  n.nspname  = 'public'
+      AND  e.enumlabel IN ('PSS', 'WHO5')
   ) THEN
     CREATE TYPE "AssessmentType_new" AS ENUM (
       'CBI',
