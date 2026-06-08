@@ -527,9 +527,18 @@ assessmentsRouter.get(
       }
     }
 
-    if (!cycle)                    return res.status(404).json({ error: "Assessment link not found" });
-    if (cycle.status !== "ACTIVE") return res.status(410).json({ error: "This assessment is no longer active" });
-    if (new Date() > cycle.endsAt) return res.status(410).json({ error: "This assessment has expired" });
+    if (!cycle) {
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(404).json({ error: "Assessment link not found" });
+    }
+    if (cycle.status !== "ACTIVE") {
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(410).json({ error: "This assessment is no longer active" });
+    }
+    if (new Date() > cycle.endsAt) {
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(410).json({ error: "This assessment has expired" });
+    }
 
     // Fetch type as plain text to bypass Prisma enum validation
     const [typeRow] = await prisma.$queryRaw<{ type: string }[]>`

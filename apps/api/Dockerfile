@@ -3,19 +3,24 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy workspace manifests + lock file first so Docker can cache the npm ci layer
+# Copy workspace manifests + lock file first so Docker can cache the npm ci layer.
+# schema.prisma is copied here too: its presence lets @prisma/client's postinstall
+# generate the client correctly, and any schema change busts this cache layer so
+# the deployed container can never ship a stale generated client.
 COPY package.json package-lock.json ./
-COPY packages/database/package.json packages/database/
-COPY apps/api/package.json           apps/api/
+COPY packages/database/package.json                    packages/database/
+COPY packages/database/prisma/schema.prisma            packages/database/prisma/
+COPY apps/api/package.json                             apps/api/
 
 RUN npm ci --workspace=apps/api --workspace=packages/database
 
-# Copy source
+# Copy remaining source (schema already present from above)
 COPY packages/database               packages/database
 COPY packages/scoring/definitions    packages/scoring/definitions
 COPY apps/api                        apps/api
 
-# Generate Prisma client (requires schema, not a DB connection)
+# Re-run generate explicitly to ensure the client matches the committed schema
+# (belt-and-suspenders: postinstall above already ran it, this is idempotent)
 RUN node_modules/.bin/prisma generate \
       --schema=packages/database/prisma/schema.prisma
 
