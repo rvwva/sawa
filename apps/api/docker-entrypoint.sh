@@ -1,18 +1,16 @@
 #!/bin/sh
 # Run Prisma migrations and seed, then hand off to the Node process.
 # 'exec' replaces this shell with node so signals (SIGTERM etc.) propagate correctly.
-set -e
+set -ex
 
-# 1. Apply any pending migrations (idempotent — uses advisory lock)
-echo "[entrypoint] Running database migrations..."
+echo "=== STEP 1: Starting prisma migrate deploy ==="
 node node_modules/.bin/prisma migrate deploy \
   --schema packages/database/prisma/schema.prisma
+echo "=== STEP 1: Complete ==="
 
-# 2. Seed assessment definitions + admin user (all upserts — safe to repeat)
-#    Reads ADMIN_EMAIL + ADMIN_PASSWORD from env (injected via Secret Manager on Cloud Run).
-#    Set SKIP_DEMO_ORG=true in production to skip the demo organisation.
-echo "[entrypoint] Running seed..."
+echo "=== STEP 2: Starting seed ==="
 node node_modules/.bin/tsx packages/database/prisma/seed.ts
+echo "=== STEP 2: Complete ==="
 
-echo "[entrypoint] Startup complete — starting API server"
+echo "=== STEP 3: Starting server ==="
 exec node dist/index.js
