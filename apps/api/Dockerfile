@@ -11,6 +11,7 @@ COPY package.json package-lock.json ./
 COPY packages/database/package.json                    packages/database/
 COPY packages/database/prisma/schema.prisma            packages/database/prisma/
 COPY apps/api/package.json                             apps/api/
+COPY apps/web/package.json                             apps/web/
 
 RUN npm ci --workspace=apps/api --workspace=packages/database
 
