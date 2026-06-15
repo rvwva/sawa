@@ -4,13 +4,13 @@
 # Substitutions (set in Cloud Build trigger, defaults below are the live values):
 #   _REGION    me-central2
 #   _REPO      mindlign
-#   _API_URL   https://api.mindlign.com
+#   _API_URL   https://mindlign-api-130882200268.me-central2.run.app
 #   _WEB_URL   https://mindlign.com
 
 substitutions:
   _REGION: me-central2
   _REPO: mindlign
-  _API_URL: https://api.mindlign.com
+  _API_URL: https://mindlign-api-130882200268.me-central2.run.app
   _WEB_URL: https://mindlign.com
 
 options:
