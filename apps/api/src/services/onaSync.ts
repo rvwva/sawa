@@ -144,8 +144,20 @@ export async function runOnaSync(
     edgeWeights.set(edgeKey, (edgeWeights.get(edgeKey) ?? 0) + w);
   }
 
+  // Only keep edges where both directions have at least one interaction.
+  // This filters out broadcast emails where A sends to B but B never responds.
+  const bidirectionalEdges = new Set<string>();
+  for (const [edgeKey] of edgeWeights) {
+    const [from, to] = edgeKey.split("|");
+    const reverseKey = `${to}|${from}`;
+    if (edgeWeights.has(reverseKey)) {
+      bidirectionalEdges.add(edgeKey);
+    }
+  }
+
   for (const [edgeKey, weight] of edgeWeights) {
     if (weight < MIN_EDGE_WEIGHT) continue;
+    if (!bidirectionalEdges.has(edgeKey)) continue;
     const [from, to] = edgeKey.split("|");
     if (graph.hasEdge(from, to)) {
       graph.setEdgeAttribute(from, to, "weight", weight);
@@ -185,6 +197,7 @@ export async function runOnaSync(
     if (!emailToUser.has(hFrom) || !emailToUser.has(hTo) || from === to) continue;
     const edgeKey = `${hFrom}|${hTo}`;
     if ((edgeWeights.get(edgeKey) ?? 0) < MIN_EDGE_WEIGHT) continue;
+    if (!bidirectionalEdges.has(edgeKey)) continue;
     interactionRows.push({
       organisationId: orgId,
       fromUserEmail: hFrom,
@@ -291,6 +304,10 @@ async function fetchEmailMetadata(
 ): Promise<[string, string][]> {
   const pairs: [string, string][] = [];
   const filter = `sentDateTime ge ${since.toISOString()}`;
+  // PRIVACY: $select intentionally excludes subject, body, bodyPreview, and attachments.
+  // Mail.ReadBasic.All returns all properties except body/attachments, but subject IS
+  // accessible. We explicitly exclude it here to maintain metadata-only access.
+  // Never add 'subject' or 'body' to this $select — this is a legal compliance boundary.
   let url: string | null =
     `/users/${userId}/mailFolders/SentItems/messages?$select=sender,toRecipients,sentDateTime&$filter=${encodeURIComponent(filter)}&$top=100`;
 
@@ -317,6 +334,10 @@ async function fetchMeetingMetadata(
   end: Date
 ): Promise<[string, string][]> {
   const pairs: [string, string][] = [];
+  // PRIVACY: $select intentionally excludes subject, location, body, and extensions.
+  // Calendars.ReadBasic.All returns subject and location if requested — we explicitly
+  // exclude them here to maintain metadata-only access.
+  // Never add 'subject' or 'location' to this $select — this is a legal compliance boundary.
   let url: string | null =
     `/users/${userId}/calendarView?startDateTime=${start.toISOString()}&endDateTime=${end.toISOString()}&$select=attendees,organizer,start,end&$top=100`;
 
