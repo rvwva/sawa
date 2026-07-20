@@ -141,9 +141,15 @@ export function startScheduler(): void {
   async function syncAllOnaOrgs(): Promise<void> {
     const orgs = await prisma.organisation.findMany({ where: { onaEnabled: true } });
     for (const org of orgs) {
-      await runOnaSync(org.id).catch((err) =>
-        logger.error(`ONA sync failed for org ${org.id}`, { err })
-      );
+      const syncResult = await runOnaSync(org.id).catch((err) => {
+        logger.error(`ONA sync failed for org ${org.id}`, { err });
+        return undefined;
+      });
+      if (syncResult) {
+        logger.info(
+          `ONA sync org ${org.id}: ${syncResult.employeesProcessed} employees processed, reciprocity reliable: ${syncResult.reciprocityReliable}`
+        );
+      }
       await runOnaCorrelation(org.id).catch((err) =>
         logger.error(`ONA correlation failed for org ${org.id}`, { err })
       );

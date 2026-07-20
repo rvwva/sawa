@@ -52,10 +52,11 @@ onaRouter.post(
       const { orgId } = req.params;
       const { cycleId } = req.body;
 
-      await runOnaSync(orgId);
+      const { reciprocityReliable, employeesProcessed } = await runOnaSync(orgId);
+      logger.info(`ONA sync: ${employeesProcessed} employees, reciprocity reliable: ${reciprocityReliable}`);
       await runOnaCorrelation(orgId, cycleId);
 
-      res.json({ success: true, message: "ONA sync complete" });
+      res.json({ success: true, message: "ONA sync complete", employeesProcessed, reciprocityReliable });
     } catch (err) {
       logger.error("ONA sync failed", { err });
       res.status(500).json({ error: (err as Error).message });

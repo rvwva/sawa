@@ -26,10 +26,22 @@ function hashEmail(email: string, orgSalt: string): string {
     .digest("hex");
 }
 
+const SYSTEM_EMAIL_PATTERNS = [
+  "noreply@", "no-reply@", "notifications@", "donotreply@",
+  "mailer-daemon@", "postmaster@", "bounce@", "auto-reply@",
+  "automated@", "system@", "support@", "help@", "info@",
+];
+
+function isSystemEmail(email: string): boolean {
+  const lower = email.toLowerCase();
+  return SYSTEM_EMAIL_PATTERNS.some((pattern) => lower.includes(pattern));
+}
+
 const DAYS_LOOKBACK = 90;
 const EMAIL_WEIGHT = 1.0;
 const MEETING_WEIGHT = 2.0;
 const OVERLOAD_PERCENTILE = 0.9;
+const MIN_EDGE_WEIGHT = 3.0;
 
 interface UserRecord {
   id: string;
@@ -41,7 +53,9 @@ interface UserRecord {
 
 // ─── Main sync function ───────────────────────────────────────────────────────
 
-export async function runOnaSync(orgId: string): Promise<void> {
+export async function runOnaSync(
+  orgId: string
+): Promise<{ reciprocityReliable: boolean; employeesProcessed: number }> {
   logger.info(`ONA sync starting for org ${orgId}`);
 
   const org = await prisma.organisation.findUnique({
@@ -69,6 +83,17 @@ export async function runOnaSync(orgId: string): Promise<void> {
   // ── Fetch employee directory ──────────────────────────────────────────────
   const users = await fetchUsers(graphClient);
   const emailToUser = new Map(users.map((u) => [hashEmail(u.email, org.id), u]));
+
+  // ── Manager relationship data quality check ───────────────────────────────
+  const usersWithManager = users.filter((u) => u.managerId).length;
+  const managerCoverageRate = users.length > 0 ? usersWithManager / users.length : 0;
+  const reciprocityReliable = managerCoverageRate >= 0.20;
+
+  if (!reciprocityReliable) {
+    logger.warn(
+      `ONA sync org ${orgId}: only ${Math.round(managerCoverageRate * 100)}% of users have manager relationships in M365 directory. Reciprocity scores will default to 0.5 and should not be used for insight card generation.`
+    );
+  }
 
   // ── Build email department mapping using org departments ──────────────────
   const deptNameToId = new Map(org.departments.map((d) => [d.name.toLowerCase(), d.id]));
@@ -110,6 +135,7 @@ export async function runOnaSync(orgId: string): Promise<void> {
 
   for (const [key, count] of interactionMap) {
     const [from, to, type] = key.split("|");
+    if (isSystemEmail(from) || isSystemEmail(to)) continue;
     const hFrom = hashEmail(from, org.id);
     const hTo = hashEmail(to, org.id);
     if (!emailToUser.has(hFrom) || !emailToUser.has(hTo) || from === to) continue;
@@ -119,6 +145,7 @@ export async function runOnaSync(orgId: string): Promise<void> {
   }
 
   for (const [edgeKey, weight] of edgeWeights) {
+    if (weight < MIN_EDGE_WEIGHT) continue;
     const [from, to] = edgeKey.split("|");
     if (graph.hasEdge(from, to)) {
       graph.setEdgeAttribute(from, to, "weight", weight);
@@ -152,9 +179,12 @@ export async function runOnaSync(orgId: string): Promise<void> {
   const interactionRows = [];
   for (const [key, count] of interactionMap) {
     const [from, to, type] = key.split("|");
+    if (isSystemEmail(from) || isSystemEmail(to)) continue;
     const hFrom = hashEmail(from, org.id);
     const hTo = hashEmail(to, org.id);
     if (!emailToUser.has(hFrom) || !emailToUser.has(hTo) || from === to) continue;
+    const edgeKey = `${hFrom}|${hTo}`;
+    if ((edgeWeights.get(edgeKey) ?? 0) < MIN_EDGE_WEIGHT) continue;
     interactionRows.push({
       organisationId: orgId,
       fromUserEmail: hFrom,
@@ -183,7 +213,7 @@ export async function runOnaSync(orgId: string): Promise<void> {
     // Reciprocity: ratio of manager-initiated interactions with direct reports
     const reports = users.filter((u) => u.managerId === user.id);
     let reciprocityScore = 0.5; // neutral default
-    if (reports.length > 0) {
+    if (reciprocityReliable && reports.length > 0) {
       let managerInitiated = 0;
       let total = 0;
       for (const report of reports) {
@@ -225,6 +255,8 @@ export async function runOnaSync(orgId: string): Promise<void> {
   });
 
   logger.info(`ONA sync complete for org ${orgId} — ${metricRows.length} employees processed`);
+
+  return { reciprocityReliable, employeesProcessed: metricRows.length };
 }
 
 // ─── Graph API helpers ────────────────────────────────────────────────────────

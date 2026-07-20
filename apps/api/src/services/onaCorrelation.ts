@@ -8,6 +8,8 @@
 import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
 
+const MIN_DEPT_SIZE_FOR_ONA = 5;
+
 const THRESHOLDS = {
   isolation: { urgent: 0.70, moderate: 0.50 },
   burnout: { urgent: 65, moderate: 50 },
@@ -69,6 +71,13 @@ export async function runOnaCorrelation(orgId: string, cycleId?: string): Promis
   const cards = [];
 
   for (const [deptId, deptMetrics] of byDept) {
+    if (deptMetrics.length < MIN_DEPT_SIZE_FOR_ONA) {
+      logger.info(
+        `ONA correlation: skipping dept ${deptMetrics[0].department?.name} — only ${deptMetrics.length} employees (min ${MIN_DEPT_SIZE_FOR_ONA})`
+      );
+      continue;
+    }
+
     const dept = deptMetrics[0].department!;
 
     // Average ONA metrics for department
