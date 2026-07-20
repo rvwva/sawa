@@ -13,6 +13,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { sendCycleReminder } from "./email";
 import { logger } from "../lib/logger";
+import { runOnaSync } from "./onaSync";
+import { runOnaCorrelation } from "./onaCorrelation";
 
 const INTERVAL_MS = 60 * 60 * 1000; // check every hour
 
@@ -124,4 +126,36 @@ export function startScheduler(): void {
       logger.error("Scheduler interval run failed", { err })
     );
   }, INTERVAL_MS);
+
+  // ONA weekly sync — fires next Sunday at 02:00, then every 7 days
+  const ONA_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+  const msUntilNextSunday = (() => {
+    const now = new Date();
+    const daysUntilSunday = (7 - now.getDay()) % 7 || 7;
+    const next = new Date(now);
+    next.setDate(now.getDate() + daysUntilSunday);
+    next.setHours(2, 0, 0, 0);
+    return Math.max(next.getTime() - now.getTime(), 0);
+  })();
+
+  async function syncAllOnaOrgs(): Promise<void> {
+    const orgs = await prisma.organisation.findMany({ where: { onaEnabled: true } });
+    for (const org of orgs) {
+      await runOnaSync(org.id).catch((err) =>
+        logger.error(`ONA sync failed for org ${org.id}`, { err })
+      );
+      await runOnaCorrelation(org.id).catch((err) =>
+        logger.error(`ONA correlation failed for org ${org.id}`, { err })
+      );
+    }
+  }
+
+  setTimeout(() => {
+    syncAllOnaOrgs().catch((err) => logger.error("ONA weekly sync failed", { err }));
+    setInterval(() => {
+      syncAllOnaOrgs().catch((err) => logger.error("ONA weekly sync failed", { err }));
+    }, ONA_INTERVAL_MS);
+  }, msUntilNextSunday);
+
+  logger.info("ONA weekly sync scheduled");
 }
