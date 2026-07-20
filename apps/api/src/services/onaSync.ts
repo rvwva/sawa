@@ -9,6 +9,7 @@
  * attendees/duration for calendar. No content, no subject lines, no titles.
  */
 
+import { createHash } from "crypto";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { TokenCredentialAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials";
 import { ClientSecretCredential } from "@azure/identity";
@@ -18,6 +19,12 @@ import betweennessCentrality from "graphology-metrics/centrality/betweenness";
 import eigenvectorCentrality from "graphology-metrics/centrality/eigenvector";
 import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
+
+function hashEmail(email: string, orgSalt: string): string {
+  return createHash("sha256")
+    .update(`${orgSalt}:${email.toLowerCase()}`)
+    .digest("hex");
+}
 
 const DAYS_LOOKBACK = 90;
 const EMAIL_WEIGHT = 1.0;
@@ -61,7 +68,7 @@ export async function runOnaSync(orgId: string): Promise<void> {
 
   // ── Fetch employee directory ──────────────────────────────────────────────
   const users = await fetchUsers(graphClient);
-  const emailToUser = new Map(users.map((u) => [u.email.toLowerCase(), u]));
+  const emailToUser = new Map(users.map((u) => [hashEmail(u.email, org.id), u]));
 
   // ── Build email department mapping using org departments ──────────────────
   const deptNameToId = new Map(org.departments.map((d) => [d.name.toLowerCase(), d.id]));
@@ -96,15 +103,17 @@ export async function runOnaSync(orgId: string): Promise<void> {
   const graph = new DirectedGraph();
 
   for (const user of users) {
-    graph.addNode(user.email);
+    graph.addNode(hashEmail(user.email, org.id));
   }
 
   const edgeWeights = new Map<string, number>(); // "from|to" -> weight
 
   for (const [key, count] of interactionMap) {
     const [from, to, type] = key.split("|");
-    if (!emailToUser.has(from) || !emailToUser.has(to) || from === to) continue;
-    const edgeKey = `${from}|${to}`;
+    const hFrom = hashEmail(from, org.id);
+    const hTo = hashEmail(to, org.id);
+    if (!emailToUser.has(hFrom) || !emailToUser.has(hTo) || from === to) continue;
+    const edgeKey = `${hFrom}|${hTo}`;
     const w = type === "meeting" ? MEETING_WEIGHT * count : EMAIL_WEIGHT * count;
     edgeWeights.set(edgeKey, (edgeWeights.get(edgeKey) ?? 0) + w);
   }
@@ -143,11 +152,13 @@ export async function runOnaSync(orgId: string): Promise<void> {
   const interactionRows = [];
   for (const [key, count] of interactionMap) {
     const [from, to, type] = key.split("|");
-    if (!emailToUser.has(from) || !emailToUser.has(to) || from === to) continue;
+    const hFrom = hashEmail(from, org.id);
+    const hTo = hashEmail(to, org.id);
+    if (!emailToUser.has(hFrom) || !emailToUser.has(hTo) || from === to) continue;
     interactionRows.push({
       organisationId: orgId,
-      fromUserEmail: from,
-      toUserEmail: to,
+      fromUserEmail: hFrom,
+      toUserEmail: hTo,
       type,
       weight: type === "meeting" ? MEETING_WEIGHT * count : EMAIL_WEIGHT * count,
       periodStart,
@@ -165,7 +176,8 @@ export async function runOnaSync(orgId: string): Promise<void> {
   const metricRows = [];
   for (const user of users) {
     const email = user.email.toLowerCase();
-    const deg = degCentrality[email] ?? 0;
+    const hEmail = hashEmail(email, org.id);
+    const deg = degCentrality[hEmail] ?? 0;
     const normalizedDeg = deg / maxDeg;
 
     // Reciprocity: ratio of manager-initiated interactions with direct reports
@@ -175,8 +187,9 @@ export async function runOnaSync(orgId: string): Promise<void> {
       let managerInitiated = 0;
       let total = 0;
       for (const report of reports) {
-        const outbound = edgeWeights.get(`${email}|${report.email.toLowerCase()}`) ?? 0;
-        const inbound = edgeWeights.get(`${report.email.toLowerCase()}|${email}`) ?? 0;
+        const hReport = hashEmail(report.email, org.id);
+        const outbound = edgeWeights.get(`${hEmail}|${hReport}`) ?? 0;
+        const inbound = edgeWeights.get(`${hReport}|${hEmail}`) ?? 0;
         managerInitiated += outbound;
         total += outbound + inbound;
       }
@@ -190,11 +203,11 @@ export async function runOnaSync(orgId: string): Promise<void> {
 
     metricRows.push({
       organisationId: orgId,
-      userEmail: email,
+      userEmail: hEmail,
       departmentId: deptId,
       degreeCentrality: normalizedDeg,
-      betweenness: btwnCentrality[email] ?? 0,
-      eigenvector: eigCentrality[email] ?? 0,
+      betweenness: btwnCentrality[hEmail] ?? 0,
+      eigenvector: eigCentrality[hEmail] ?? 0,
       isolationScore: 1 - normalizedDeg,
       collaborationLoad: deg >= overloadThreshold ? 1.0 : deg / overloadThreshold,
       reciprocityScore,
