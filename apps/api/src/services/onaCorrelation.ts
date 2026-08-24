@@ -1,8 +1,35 @@
 /**
- * Mindlign ONA Correlation Engine
- * =================================
- * Cross-references passive ONA metrics with psychometric scale scores
- * per department to generate triple-signal insight cards.
+ * Mindlign ONA + Cross-Pillar Correlation Engine
+ * =================================================
+ * Cross-references passive ONA network metrics with psychometric scale
+ * scores per department to generate insight cards.
+ *
+ * ARCHITECTURE NOTE (Aug 2026 rewrite):
+ * Each AssessmentCycle is tied to exactly one AssessmentType (schema:
+ * AssessmentCycle.assessmentId -> Assessment.type). A department's CBI,
+ * PSYCH_SAFETY, TURNOVER, and LMX7 scores therefore come from DIFFERENT
+ * cycles administered at different times — there is no single cycle that
+ * contains "all" scale scores for a department at once.
+ *
+ * This engine correlates each department's LATEST CLOSED cycle per
+ * assessment type, regardless of date. (Decision: no real client data
+ * exists yet, so prioritize the correct sustainable architecture now
+ * rather than a same-window filter that would silently drop coverage
+ * while the platform is still new.)
+ *
+ * This rewrite also fixes a real bug in the original implementation:
+ * CBI, PSYCH_SAFETY, and TURNOVER all wrote scores under the literal
+ * subscale key "total". The old code read `deptScores.get("total")`
+ * without checking assessment type, so a burnout value and an
+ * "engagement" value (itself checking a UWES scale that doesn't exist
+ * in this codebase) were silently the same number under two different
+ * names. Scores are now keyed by `${AssessmentType}:${subscale}`, and
+ * every scale carries an explicit direction so a "good" LMX7 score can
+ * never be misread as a risk signal or vice versa.
+ *
+ * Adding a new scale (e.g. CULTURE, or UWES if it's ever built) means
+ * adding one entry to SCALE_SIGNALS and one to SIGNAL_PHRASES — nothing
+ * else in this file needs to change.
  */
 
 import { prisma } from "../lib/prisma";
@@ -10,18 +37,97 @@ import { logger } from "../lib/logger";
 
 const MIN_DEPT_SIZE_FOR_ONA = 5;
 
-const THRESHOLDS = {
-  isolation: { urgent: 0.70, moderate: 0.50 },
-  burnout: { urgent: 65, moderate: 50 },
-  reciprocity: { low: 0.30 },
-  collaborationLoad: { overloaded: 0.90 },
-  engagement: { healthy: 65 },
+const ONA_METRIC_THRESHOLDS = {
+  isolation: { urgent: 0.7, moderate: 0.5 },
+  reciprocity: { low: 0.3 },
+  collaborationLoad: { overloaded: 0.9 },
 };
 
-export async function runOnaCorrelation(orgId: string, cycleId?: string): Promise<void> {
+type Direction = "higher_is_worse" | "higher_is_better";
+
+interface ScaleSignalDef {
+  direction: Direction;
+  riskThreshold: number; // crossing this in the "bad" direction = risk signal
+  healthyThreshold: number; // crossing this in the "good" direction = positive signal
+  riskSignalKey: string;
+}
+
+// Keyed by `${AssessmentType}:${subscale}` — must match the literal
+// subscale keys written by packages/scoring/definitions/*.ts exactly.
+const SCALE_SIGNALS: Record<string, ScaleSignalDef> = {
+  "CBI:total": {
+    direction: "higher_is_worse",
+    riskThreshold: 65, // CBI "High" band floor
+    healthyThreshold: 40,
+    riskSignalKey: "elevated_burnout",
+  },
+  "PSYCH_SAFETY:total": {
+    direction: "higher_is_better",
+    riskThreshold: 49, // "Low" band ceiling
+    healthyThreshold: 75, // "Healthy" band floor
+    riskSignalKey: "low_psych_safety",
+  },
+  "TURNOVER:total": {
+    direction: "higher_is_worse",
+    riskThreshold: 60, // "High" band floor
+    healthyThreshold: 30,
+    riskSignalKey: "high_turnover_intention",
+  },
+  "LMX7:total": {
+    direction: "higher_is_better",
+    riskThreshold: 44, // "Low" band ceiling
+    healthyThreshold: 70, // "Healthy" band floor
+    riskSignalKey: "weak_manager_relationship",
+  },
+};
+
+const SIGNAL_PHRASES: Record<string, { en: string; ar: string; urgentEligible: boolean }> = {
+  high_isolation: {
+    en: "structural isolation from the rest of the organization",
+    ar: "عزلة هيكلية عن بقية المؤسسة",
+    urgentEligible: true,
+  },
+  moderate_isolation: {
+    en: "early signs of network isolation",
+    ar: "مؤشرات مبكرة على العزلة الشبكية",
+    urgentEligible: false,
+  },
+  low_manager_reciprocity: {
+    en: "low manager communication reciprocity",
+    ar: "ضعف التواصل المتبادل مع المدير",
+    urgentEligible: true,
+  },
+  collaboration_overload: {
+    en: "collaboration overload",
+    ar: "زيادة العبء التعاوني",
+    urgentEligible: false,
+  },
+  elevated_burnout: {
+    en: "elevated burnout scores",
+    ar: "ارتفاع مستويات الإرهاق",
+    urgentEligible: true,
+  },
+  low_psych_safety: {
+    en: "low psychological safety",
+    ar: "انخفاض الأمان النفسي",
+    urgentEligible: true,
+  },
+  high_turnover_intention: {
+    en: "high turnover intention",
+    ar: "ارتفاع نية ترك العمل",
+    urgentEligible: true,
+  },
+  weak_manager_relationship: {
+    en: "a weak manager relationship (LMX-7)",
+    ar: "علاقة ضعيفة مع المدير (LMX-7)",
+    urgentEligible: true,
+  },
+};
+
+export async function runOnaCorrelation(orgId: string, triggeredByCycleId?: string): Promise<void> {
   logger.info(`ONA correlation starting for org ${orgId}`);
 
-  // Get departments with ONA metrics
+  // ── ONA network metrics ───────────────────────────────────────────────
   const metrics = await prisma.onaMetric.findMany({
     where: { organisationId: orgId, departmentId: { not: null } },
     include: { department: true },
@@ -32,7 +138,6 @@ export async function runOnaCorrelation(orgId: string, cycleId?: string): Promis
     return;
   }
 
-  // Group metrics by department
   const byDept = new Map<string, typeof metrics>();
   for (const m of metrics) {
     if (!m.departmentId) continue;
@@ -41,31 +146,55 @@ export async function runOnaCorrelation(orgId: string, cycleId?: string): Promis
     byDept.set(m.departmentId, arr);
   }
 
-  // Get latest scale scores per department if cycle provided
-  const scaleScores = cycleId
+  // ── Latest CLOSED cycle per assessment type for this org ─────────────
+  const closedCycles = await prisma.assessmentCycle.findMany({
+    where: { organisationId: orgId, status: "CLOSED" },
+    orderBy: { endsAt: "desc" },
+    include: { assessment: { select: { type: true } } },
+  });
+
+  const latestCycleByType = new Map<string, (typeof closedCycles)[number]>();
+  for (const c of closedCycles) {
+    if (!latestCycleByType.has(c.assessment.type)) {
+      latestCycleByType.set(c.assessment.type, c);
+    }
+  }
+
+  const cycleIdToType = new Map<string, string>();
+  for (const [type, cycle] of latestCycleByType) {
+    cycleIdToType.set(cycle.id, type);
+  }
+  const relevantCycleIds = [...cycleIdToType.keys()];
+
+  // ── Scale scores across each type's latest closed cycle ──────────────
+  const scores = relevantCycleIds.length
     ? await prisma.score.findMany({
         where: {
           respondent: {
-            cycle: { organisationId: orgId, id: cycleId },
+            cycleId: { in: relevantCycleIds },
             departmentId: { not: null },
           },
         },
-        include: { respondent: { select: { departmentId: true } } },
+        include: {
+          respondent: { select: { departmentId: true, cycleId: true } },
+        },
       })
     : [];
 
-  // Group scale scores by department + subscale
+  // deptId -> "AssessmentType:subscale" -> number[]
   const scoresByDept = new Map<string, Map<string, number[]>>();
-  for (const s of scaleScores) {
-    const deptId = s.respondent.departmentId!;
+  for (const s of scores) {
+    const deptId = s.respondent.departmentId;
+    const type = cycleIdToType.get(s.respondent.cycleId);
+    if (!deptId || !type) continue;
+    const key = `${type}:${s.subscale}`;
     if (!scoresByDept.has(deptId)) scoresByDept.set(deptId, new Map());
     const deptMap = scoresByDept.get(deptId)!;
-    const arr = deptMap.get(s.subscale) ?? [];
+    const arr = deptMap.get(key) ?? [];
     arr.push(s.scaledScore);
-    deptMap.set(s.subscale, arr);
+    deptMap.set(key, arr);
   }
 
-  // Delete existing insight cards for this org
   await prisma.onaInsightCard.deleteMany({ where: { organisationId: orgId } });
 
   const cards = [];
@@ -79,81 +208,78 @@ export async function runOnaCorrelation(orgId: string, cycleId?: string): Promis
     }
 
     const dept = deptMetrics[0].department!;
-
-    // Average ONA metrics for department
     const avgIsolation = avg(deptMetrics.map((m) => m.isolationScore));
     const avgReciprocity = avg(deptMetrics.map((m) => m.reciprocityScore));
     const avgCollabLoad = avg(deptMetrics.map((m) => m.collaborationLoad));
-
-    // Average scale scores
     const deptScores = scoresByDept.get(deptId);
-    const avgBurnout = deptScores?.get("total") ? avg(deptScores.get("total")!) : null;
-    const avgEngagement = deptScores?.get("total") ? avg(deptScores.get("total")!) : null;
 
-    // Build signals array
     const signals: string[] = [];
-    let riskLevel = "healthy";
+    const urgentEligible: string[] = [];
+    let riskLevel: "healthy" | "moderate" | "urgent" = "healthy";
+    let hasPositiveSignal = false;
 
-    if (avgIsolation > THRESHOLDS.isolation.urgent) {
+    // ── ONA network signals ──────────────────────────────────────────
+    if (avgIsolation > ONA_METRIC_THRESHOLDS.isolation.urgent) {
       signals.push("high_isolation");
+      urgentEligible.push("high_isolation");
       riskLevel = "moderate";
-    } else if (avgIsolation > THRESHOLDS.isolation.moderate) {
+    } else if (avgIsolation > ONA_METRIC_THRESHOLDS.isolation.moderate) {
       signals.push("moderate_isolation");
-    }
-
-    if (avgBurnout !== null && avgBurnout > THRESHOLDS.burnout.urgent) {
-      signals.push("high_burnout");
       riskLevel = "moderate";
-    } else if (avgBurnout !== null && avgBurnout > THRESHOLDS.burnout.moderate) {
-      signals.push("moderate_burnout");
     }
 
-    if (avgReciprocity < THRESHOLDS.reciprocity.low) {
+    if (avgReciprocity < ONA_METRIC_THRESHOLDS.reciprocity.low) {
       signals.push("low_manager_reciprocity");
+      urgentEligible.push("low_manager_reciprocity");
       riskLevel = "moderate";
     }
 
-    if (avgCollabLoad > THRESHOLDS.collaborationLoad.overloaded) {
+    if (avgCollabLoad > ONA_METRIC_THRESHOLDS.collaborationLoad.overloaded) {
       signals.push("collaboration_overload");
+      riskLevel = "moderate";
     }
 
-    // Triple signal = urgent
-    const urgentSignals = signals.filter((s) =>
-      ["high_isolation", "high_burnout", "low_manager_reciprocity"].includes(s)
-    );
-    if (urgentSignals.length >= 2) riskLevel = "urgent";
+    // ── Scale signals — type-qualified, direction-aware ──────────────
+    for (const [scaleKey, def] of Object.entries(SCALE_SIGNALS)) {
+      const values = deptScores?.get(scaleKey);
+      if (!values || values.length === 0) continue;
+      const scaleAvg = avg(values);
 
-    // Healthy override
-    if (
-      signals.length === 0 &&
-      avgEngagement !== null &&
-      avgEngagement > THRESHOLDS.engagement.healthy
-    ) {
-      riskLevel = "healthy";
+      const isRisk =
+        def.direction === "higher_is_worse" ? scaleAvg > def.riskThreshold : scaleAvg < def.riskThreshold;
+
+      if (isRisk) {
+        signals.push(def.riskSignalKey);
+        riskLevel = "moderate";
+        if (SIGNAL_PHRASES[def.riskSignalKey]?.urgentEligible) {
+          urgentEligible.push(def.riskSignalKey);
+        }
+        continue;
+      }
+
+      const isHealthy =
+        def.direction === "higher_is_worse" ? scaleAvg < def.healthyThreshold : scaleAvg > def.healthyThreshold;
+      if (isHealthy) hasPositiveSignal = true;
     }
 
-    const insightText = generateInsightText(
-      dept.name,
-      signals,
-      riskLevel,
-      avgIsolation,
-      avgBurnout,
-      avgReciprocity
-    );
+    // Two or more urgent-eligible signals together = urgent
+    if (urgentEligible.length >= 2) riskLevel = "urgent";
 
+    const insightText = generateInsightText(dept.name, signals, riskLevel, hasPositiveSignal);
     const insightTextAr = generateInsightTextAr(
       dept.nameAr ?? dept.name,
       signals,
       riskLevel,
-      avgIsolation,
-      avgBurnout,
-      avgReciprocity
+      hasPositiveSignal
     );
 
     cards.push({
       organisationId: orgId,
       departmentId: deptId,
-      cycleId: cycleId ?? null,
+      // No longer "the cycle whose scores were used" (scores now span
+      // several cycles across types) — this is the cycle, if any, whose
+      // closing triggered this recompute. Purely for provenance/audit.
+      cycleId: triggeredByCycleId ?? null,
       signals,
       riskLevel,
       insightText,
@@ -167,51 +293,68 @@ export async function runOnaCorrelation(orgId: string, cycleId?: string): Promis
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────
 
 function avg(values: number[]): number {
   if (values.length === 0) return 0;
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
+function joinPhrasesEn(phrases: string[]): string {
+  if (phrases.length === 1) return phrases[0];
+  return `${phrases.slice(0, -1).join(", ")}, and ${phrases[phrases.length - 1]}`;
+}
+
+function joinPhrasesAr(phrases: string[]): string {
+  return phrases.join("، ");
+}
+
 function generateInsightText(
   deptName: string,
   signals: string[],
   riskLevel: string,
-  isolation: number,
-  burnout: number | null,
-  reciprocity: number
+  hasPositiveSignal: boolean
 ): string {
+  if (signals.length === 0) {
+    return hasPositiveSignal
+      ? `${deptName} shows healthy collaboration and scale-score patterns with no critical risk signals detected.`
+      : `${deptName} shows no critical risk signals, though limited scale-score data is currently available for this department.`;
+  }
+
+  const phrases = signals.map((s) => SIGNAL_PHRASES[s]?.en ?? s.replace(/_/g, " "));
+
   if (riskLevel === "urgent") {
-    const parts: string[] = [];
-    if (signals.includes("high_isolation"))
-      parts.push("structural isolation from the rest of the organization");
-    if (signals.includes("high_burnout")) parts.push("elevated burnout scores");
-    if (signals.includes("low_manager_reciprocity"))
-      parts.push("low manager communication reciprocity");
-    return `${deptName} is showing ${parts.join(", ")}. This combination is associated with high attrition risk and requires immediate attention.`;
+    return `${deptName} is showing ${joinPhrasesEn(
+      phrases
+    )}. This combination is associated with high attrition risk and requires immediate attention.`;
   }
-  if (riskLevel === "moderate") {
-    return `${deptName} shows some early warning signals including ${signals
-      .join(", ")
-      .replace(/_/g, " ")}. Monitor closely over the next cycle.`;
-  }
-  return `${deptName} shows healthy collaboration patterns with no critical risk signals detected.`;
+
+  return `${deptName} shows early warning signals including ${joinPhrasesEn(
+    phrases
+  )}. Monitor closely over the next cycle.`;
 }
 
 function generateInsightTextAr(
   deptName: string,
   signals: string[],
   riskLevel: string,
-  _isolation: number,
-  _burnout: number | null,
-  _reciprocity: number
+  hasPositiveSignal: boolean
 ): string {
+  if (signals.length === 0) {
+    return hasPositiveSignal
+      ? `يُظهر قسم ${deptName} أنماط تعاون ونتائج مقاييس صحية دون مؤشرات خطر حرجة.`
+      : `لا تظهر على قسم ${deptName} مؤشرات خطر حرجة، مع محدودية بيانات المقاييس المتاحة حالياً لهذا القسم.`;
+  }
+
+  const phrases = signals.map((s) => SIGNAL_PHRASES[s]?.ar ?? s);
+
   if (riskLevel === "urgent") {
-    return `يُظهر قسم ${deptName} مؤشرات حرجة تشمل العزلة التنظيمية وارتفاع الإرهاق وضعف التواصل مع المدير. هذا النمط مرتبط بمخاطر دوران عالية ويتطلب تدخلاً فورياً.`;
+    return `يُظهر قسم ${deptName} مؤشرات حرجة تشمل ${joinPhrasesAr(
+      phrases
+    )}. هذا النمط مرتبط بمخاطر دوران عالية ويتطلب تدخلاً فورياً.`;
   }
-  if (riskLevel === "moderate") {
-    return `يُظهر قسم ${deptName} بعض إشارات الإنذار المبكر. يُنصح بالمتابعة الدقيقة خلال الدورة القادمة.`;
-  }
-  return `يُظهر قسم ${deptName} أنماط تعاون صحية دون مؤشرات خطر حرجة.`;
+
+  return `يُظهر قسم ${deptName} إشارات إنذار مبكر تشمل ${joinPhrasesAr(
+    phrases
+  )}. يُنصح بالمتابعة الدقيقة خلال الدورة القادمة.`;
 }
