@@ -14,17 +14,17 @@ datasource db {
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
 enum UserRole {
-  ADMIN        // Sawa platform admin — full access
-  EXECUTIVE    // HR/Executive client — their org only
-  EMPLOYEE     // Anonymous respondent — no login required
+  ADMIN // Sawa platform admin — full access
+  EXECUTIVE // HR/Executive client — their org only
+  EMPLOYEE // Anonymous respondent — no login required
 }
 
 enum AssessmentType {
-  CBI          // Copenhagen Burnout Inventory (19 items)
-  CULTURE      // Proprietary Culture Assessment (40 items)
+  CBI // Copenhagen Burnout Inventory (19 items)
+  CULTURE // Proprietary Culture Assessment (40 items)
   PSYCH_SAFETY // Psychological Safety Scale (7 items)
-  TURNOVER     // Turnover Intention Scale (3 items)
-  LMX7         // Leader-Member Exchange LMX-7 (7 items)
+  TURNOVER // Turnover Intention Scale (3 items)
+  LMX7 // Leader-Member Exchange LMX-7 (7 items)
 }
 
 enum CycleStatus {
@@ -73,38 +73,50 @@ enum SeniorityLevel {
 // ─── Organisations ──────────────────────────────────────────────────────────
 
 model Organisation {
-  id          String   @id @default(cuid())
-  name        String
-  nameAr      String?  @map("name_ar")
-  slug        String   @unique
-  logoUrl     String?  @map("logo_url")
-  industry    String?
-  sizeRange   String?  @map("size_range")   // e.g. "50-200"
-  countryCode String   @default("SA") @map("country_code")
-  timezone           String   @default("Asia/Riyadh")
+  id                 String    @id @default(cuid())
+  name               String
+  nameAr             String?   @map("name_ar")
+  slug               String    @unique
+  logoUrl            String?   @map("logo_url")
+  industry           String?
+  sizeRange          String?   @map("size_range") // e.g. "50-200"
+  countryCode        String    @default("SA") @map("country_code")
+  timezone           String    @default("Asia/Riyadh")
   // Admin-configured cycle frequency (days). 0 = ad-hoc. e.g. 30 = monthly, 90 = quarterly.
-  cycleFrequencyDays Int?     @map("cycle_frequency_days")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  cycleFrequencyDays Int?      @map("cycle_frequency_days")
+  // Microsoft 365 integration for passive ONA
+  m365TenantId       String?   @map("m365_tenant_id")
+  m365ClientId       String?   @map("m365_client_id")
+  m365ClientSecret   String?   @map("m365_client_secret")
+  onaEnabled         Boolean   @default(false) @map("ona_enabled")
+  onaLastSyncAt      DateTime? @map("ona_last_sync_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  departments Department[]
-  users       User[]
-  cycles      AssessmentCycle[]
-  reports     Report[]
-  employees   Employee[]
+  departments     Department[]
+  users           User[]
+  cycles          AssessmentCycle[]
+  reports         Report[]
+  employees       Employee[]
+  onaInteractions OnaInteraction[]
+  onaMetrics      OnaMetric[]
+  onaInsightCards OnaInsightCard[]
+  onaConsentLogs  OnaConsentLog[]
 
   @@map("organisations")
 }
 
 model Department {
-  id             String       @id @default(cuid())
-  organisationId String       @map("organisation_id")
+  id             String   @id @default(cuid())
+  organisationId String   @map("organisation_id")
   name           String
-  nameAr         String?      @map("name_ar")
-  createdAt      DateTime     @default(now()) @map("created_at")
+  nameAr         String?  @map("name_ar")
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  respondents    Respondent[]
+  organisation    Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  respondents     Respondent[]
+  onaMetrics      OnaMetric[]
+  onaInsightCards OnaInsightCard[]
 
   @@map("departments")
 }
@@ -112,32 +124,32 @@ model Department {
 // ─── Users (Admin + Executive/HR — employees use anonymous tokens) ──────────
 
 model User {
-  id             String       @id @default(cuid())
-  organisationId String?      @map("organisation_id")
-  email          String       @unique
-  passwordHash   String       @map("password_hash")
-  firstName      String       @map("first_name")
-  lastName       String       @map("last_name")
+  id             String    @id @default(cuid())
+  organisationId String?   @map("organisation_id")
+  email          String    @unique
+  passwordHash   String    @map("password_hash")
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
   role           UserRole
-  isActive       Boolean      @default(true) @map("is_active")
-  lastLoginAt    DateTime?    @map("last_login_at")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  deletedAt      DateTime?    @map("deleted_at")
+  isActive       Boolean   @default(true) @map("is_active")
+  lastLoginAt    DateTime? @map("last_login_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
 
-  organisation   Organisation? @relation(fields: [organisationId], references: [id])
-  refreshTokens  RefreshToken[]
-  auditLogs      AuditLog[]
+  organisation  Organisation?  @relation(fields: [organisationId], references: [id])
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
 
   @@map("users")
 }
 
 model RefreshToken {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  token     String   @unique
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
   revokedAt DateTime? @map("revoked_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -170,31 +182,32 @@ model Assessment {
 // ─── Assessment Cycles ──────────────────────────────────────────────────────
 
 model AssessmentCycle {
-  id             String         @id @default(cuid())
-  organisationId String         @map("organisation_id")
-  assessmentId   String         @map("assessment_id")
-  title          String
-  status         CycleStatus    @default(DRAFT)
-  startsAt       DateTime       @map("starts_at")
-  endsAt         DateTime       @map("ends_at")
+  id                 String      @id @default(cuid())
+  organisationId     String      @map("organisation_id")
+  assessmentId       String      @map("assessment_id")
+  title              String
+  status             CycleStatus @default(DRAFT)
+  startsAt           DateTime    @map("starts_at")
+  endsAt             DateTime    @map("ends_at")
   // Unique public link token for anonymous employees
-  linkToken          String         @unique @default(cuid()) @map("link_token")
+  linkToken          String      @unique @default(cuid()) @map("link_token")
   // Employee email list stored so automated reminders can be sent without re-upload
-  recipientEmails    Json?          @map("recipient_emails")       // String[]
+  recipientEmails    Json?       @map("recipient_emails") // String[]
   // Tracks which automated reminders were sent: { "3d": ISO, "1d": ISO }
-  remindersSent      Json?          @map("reminders_sent")
-  reminderSentAt     DateTime?      @map("reminder_sent_at")       // legacy manual reminder
-  closedAt           DateTime?      @map("closed_at")
+  remindersSent      Json?       @map("reminders_sent")
+  reminderSentAt     DateTime?   @map("reminder_sent_at") // legacy manual reminder
+  closedAt           DateTime?   @map("closed_at")
   // Set when HR publishes results to employees (triggers team pulse email)
-  resultsPublishedAt DateTime?      @map("results_published_at")
-  createdAt          DateTime       @default(now()) @map("created_at")
-  updatedAt          DateTime       @updatedAt @map("updated_at")
+  resultsPublishedAt DateTime?   @map("results_published_at")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
 
-  organisation     Organisation         @relation(fields: [organisationId], references: [id])
-  assessment       Assessment           @relation(fields: [assessmentId], references: [id])
-  respondents      Respondent[]
-  reports          Report[]
-  departmentLinks  CycleDepartmentLink[]
+  organisation    Organisation          @relation(fields: [organisationId], references: [id])
+  assessment      Assessment            @relation(fields: [assessmentId], references: [id])
+  respondents     Respondent[]
+  reports         Report[]
+  departmentLinks CycleDepartmentLink[]
+  onaInsightCards OnaInsightCard[]
 
   @@map("assessment_cycles")
 }
@@ -202,25 +215,25 @@ model AssessmentCycle {
 // ─── Respondents (anonymous employees) ──────────────────────────────────────
 
 model Respondent {
-  id             String    @id @default(cuid())
-  cycleId        String    @map("cycle_id")
-  departmentId   String?   @map("department_id")
+  id              String          @id @default(cuid())
+  cycleId         String          @map("cycle_id")
+  departmentId    String?         @map("department_id")
   // Pseudonymous token — never linked to PII
-  sessionToken   String    @unique @default(cuid()) @map("session_token")
-  consentGiven     Boolean        @default(false) @map("consent_given")
-  consentAt        DateTime?      @map("consent_at")
-  consentIp        String?        @map("consent_ip")
-  consentVersion   String?        @map("consent_version")
-  isSaudiNational  Boolean?       @map("is_saudi_national")
-  tenureRange      TenureRange?   @map("tenure_range")
-  seniorityLevel   SeniorityLevel? @map("seniority_level")
-  submittedAt      DateTime?      @map("submitted_at")
-  createdAt        DateTime       @default(now()) @map("created_at")
+  sessionToken    String          @unique @default(cuid()) @map("session_token")
+  consentGiven    Boolean         @default(false) @map("consent_given")
+  consentAt       DateTime?       @map("consent_at")
+  consentIp       String?         @map("consent_ip")
+  consentVersion  String?         @map("consent_version")
+  isSaudiNational Boolean?        @map("is_saudi_national")
+  tenureRange     TenureRange?    @map("tenure_range")
+  seniorityLevel  SeniorityLevel? @map("seniority_level")
+  submittedAt     DateTime?       @map("submitted_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
 
-  cycle       AssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  department  Department?     @relation(fields: [departmentId], references: [id])
-  responses   Response[]
-  scores      Score[]
+  cycle      AssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  department Department?     @relation(fields: [departmentId], references: [id])
+  responses  Response[]
+  scores     Score[]
 
   @@map("respondents")
 }
@@ -230,8 +243,8 @@ model Respondent {
 model Response {
   id           String   @id @default(cuid())
   respondentId String   @map("respondent_id")
-  questionKey  String   @map("question_key")    // e.g. "cbi_1", "pss_4"
-  rawValue     Int      @map("raw_value")        // numeric answer value
+  questionKey  String   @map("question_key") // e.g. "cbi_1", "pss_4"
+  rawValue     Int      @map("raw_value") // numeric answer value
   createdAt    DateTime @default(now()) @map("created_at")
 
   respondent Respondent @relation(fields: [respondentId], references: [id], onDelete: Cascade)
@@ -249,8 +262,8 @@ model Score {
   //   "total", "leadership", "psychological_safety", etc.
   subscale     String
   rawScore     Float    @map("raw_score")
-  scaledScore  Float    @map("scaled_score")   // normalised 0-100
-  band         String   // "Low" | "Moderate" | "High" | "Needs Attention" etc.
+  scaledScore  Float    @map("scaled_score") // normalised 0-100
+  band         String // "Low" | "Moderate" | "High" | "Needs Attention" etc.
   createdAt    DateTime @default(now()) @map("created_at")
 
   respondent Respondent @relation(fields: [respondentId], references: [id], onDelete: Cascade)
@@ -275,7 +288,7 @@ model Report {
   summaryData    Json?      @map("summary_data")
   createdAt      DateTime   @default(now()) @map("created_at")
 
-  organisation Organisation   @relation(fields: [organisationId], references: [id])
+  organisation Organisation     @relation(fields: [organisationId], references: [id])
   cycle        AssessmentCycle? @relation(fields: [cycleId], references: [id])
 
   @@map("reports")
@@ -285,11 +298,11 @@ model Report {
 
 model AuditLog {
   id         String      @id @default(cuid())
-  userId     String?     @map("user_id")       // null for anonymous actions
+  userId     String?     @map("user_id") // null for anonymous actions
   action     AuditAction
-  entityType String?     @map("entity_type")   // e.g. "Respondent", "User"
+  entityType String?     @map("entity_type") // e.g. "Respondent", "User"
   entityId   String?     @map("entity_id")
-  metadata   Json?                             // extra context (IP, changes, etc.)
+  metadata   Json? // extra context (IP, changes, etc.)
   ipAddress  String?     @map("ip_address")
   userAgent  String?     @map("user_agent")
   createdAt  DateTime    @default(now()) @map("created_at")
@@ -308,10 +321,10 @@ model Employee {
   id             String   @id @default(cuid())
   organisationId String   @map("organisation_id")
   email          String
-  department     String?  // department name from CSV (free text)
+  department     String? // department name from CSV (free text)
   createdAt      DateTime @default(now()) @map("created_at")
 
-  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
 
   @@unique([organisationId, email])
   @@map("employees")
@@ -322,13 +335,13 @@ model Employee {
 // have their response automatically tagged with that department — no selector.
 
 model CycleDepartmentLink {
-  id             String          @id @default(cuid())
-  cycleId        String          @map("cycle_id")
-  departmentName String          @map("department_name")
-  token          String          @unique @default(cuid())
+  id             String   @id @default(cuid())
+  cycleId        String   @map("cycle_id")
+  departmentName String   @map("department_name")
+  token          String   @unique @default(cuid())
   // Separate opaque token for the published results URL — scoped to this dept only
-  resultsToken   String          @unique @default(cuid()) @map("results_token")
-  createdAt      DateTime        @default(now()) @map("created_at")
+  resultsToken   String   @unique @default(cuid()) @map("results_token")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   cycle AssessmentCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
 
@@ -343,7 +356,82 @@ model DataDeletionRequest {
   sessionToken String    @map("session_token")
   requestedAt  DateTime  @default(now()) @map("requested_at")
   processedAt  DateTime? @map("processed_at")
-  status       String    @default("PENDING")   // PENDING | COMPLETED
+  status       String    @default("PENDING") // PENDING | COMPLETED
 
   @@map("data_deletion_requests")
+}
+
+// ─── Passive ONA (Organizational Network Analysis) ──────────────────────────
+
+model OnaInteraction {
+  id             String   @id @default(cuid())
+  organisationId String   @map("organisation_id")
+  fromUserEmail  String   @map("from_user_email")
+  toUserEmail    String   @map("to_user_email")
+  type           String // "email" | "meeting"
+  weight         Float
+  periodStart    DateTime @map("period_start")
+  periodEnd      DateTime @map("period_end")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId])
+  @@index([periodStart, periodEnd])
+  @@map("ona_interactions")
+}
+
+model OnaMetric {
+  id                String   @id @default(cuid())
+  organisationId    String   @map("organisation_id")
+  userEmail         String   @map("user_email")
+  departmentId      String?  @map("department_id")
+  degreeCentrality  Float    @map("degree_centrality")
+  betweenness       Float
+  eigenvector       Float
+  isolationScore    Float    @map("isolation_score")
+  collaborationLoad Float    @map("collaboration_load")
+  reciprocityScore  Float    @map("reciprocity_score")
+  periodStart       DateTime @map("period_start")
+  periodEnd         DateTime @map("period_end")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  department   Department?  @relation(fields: [departmentId], references: [id])
+
+  @@index([organisationId])
+  @@map("ona_metrics")
+}
+
+model OnaInsightCard {
+  id             String   @id @default(cuid())
+  organisationId String   @map("organisation_id")
+  departmentId   String   @map("department_id")
+  cycleId        String?  @map("cycle_id")
+  signals        Json
+  riskLevel      String   @map("risk_level")
+  insightText    String   @map("insight_text")
+  insightTextAr  String?  @map("insight_text_ar")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organisation Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  department   Department       @relation(fields: [departmentId], references: [id])
+  cycle        AssessmentCycle? @relation(fields: [cycleId], references: [id])
+
+  @@index([organisationId])
+  @@map("ona_insight_cards")
+}
+
+model OnaConsentLog {
+  id             String   @id @default(cuid())
+  organisationId String   @map("organisation_id")
+  disclosedBy    String   @map("disclosed_by")
+  disclosureDate DateTime @map("disclosure_date")
+  policyVersion  String   @map("policy_version")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@map("ona_consent_logs")
 }
