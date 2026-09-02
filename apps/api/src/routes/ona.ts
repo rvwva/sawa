@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { runOnaSync } from "../services/onaSync";
 import { runOnaCorrelation } from "../services/onaCorrelation";
 import { logger } from "../lib/logger";
+import { seedCorrelationTestData } from "../services/seedCorrelationTest";
 
 export const onaRouter = Router();
 
@@ -144,6 +145,25 @@ onaRouter.post(
     } catch (err) {
       logger.error("ONA consent create failed", { err });
       res.status(500).json({ error: "Failed to record consent" });
+    }
+  }
+);
+
+// ── TEMPORARY: seed correlation test data + run correlation (admin only) ─────
+onaRouter.post(
+  "/seed-correlation-test/:orgId",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (req, res) => {
+    try {
+      const { orgId } = req.params;
+      await seedCorrelationTestData(orgId);
+      await runOnaCorrelation(orgId);
+      const insightCardsGenerated = await prisma.onaInsightCard.count({ where: { organisationId: orgId } });
+      res.json({ success: true, insightCardsGenerated });
+    } catch (err) {
+      logger.error("Seed correlation test failed", { err });
+      res.status(500).json({ error: (err as Error).message });
     }
   }
 );
