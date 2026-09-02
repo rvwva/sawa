@@ -1,9 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { API_BASE } from "@/lib/api";
 import { dir, useTranslations, Lang } from "@/lib/i18n";
 import { useDashLang, useDashUser } from "./context";
+
+const OnaGraph = dynamic(() => import("@/components/ui/OnaGraph"), { ssr: false });
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +31,30 @@ type Cycle = {
   resultsPublishedAt?: string;
 };
 
+type OnaInsightCardData = {
+  id: string;
+  departmentId: string;
+  department: { name: string; nameAr?: string | null };
+  riskLevel: string;
+  insightText: string;
+  insightTextAr?: string | null;
+  signals: string[];
+};
+
+type OnaMetricData = {
+  id: string;
+  userEmail: string;
+  departmentId: string | null;
+  isolationScore: number;
+};
+
+type OnaResults = {
+  onaEnabled: boolean;
+  lastSyncAt: string | null;
+  insightCards: OnaInsightCardData[];
+  metrics: OnaMetricData[];
+};
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
@@ -44,6 +71,31 @@ const STATUS_AR: Record<string, string> = {
 const STATUS_ORDER: Record<string, number> = {
   ACTIVE: 0, CLOSED: 1, ARCHIVED: 2, DRAFT: 3,
 };
+
+const RISK_BADGE: Record<string, string> = {
+  urgent:   "bg-red-100 text-red-700",
+  moderate: "bg-amber-100 text-amber-700",
+  healthy:  "bg-green-100 text-green-700",
+};
+
+const RISK_BORDER: Record<string, string> = {
+  urgent:   "border-red-200",
+  moderate: "border-amber-200",
+  healthy:  "border-green-200",
+};
+
+const RISK_LABEL_AR: Record<string, string> = {
+  urgent: "عاجل", moderate: "متوسط", healthy: "صحي",
+};
+
+const DEPT_PALETTE = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#06b6d4", "#8b5cf6"];
+
+function colorForDept(deptId: string | null): string {
+  if (!deptId) return "#94a3b8";
+  let hash = 0;
+  for (let i = 0; i < deptId.length; i++) hash = (hash * 31 + deptId.charCodeAt(i)) >>> 0;
+  return DEPT_PALETTE[hash % DEPT_PALETTE.length];
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -86,8 +138,6 @@ function StatCard({
     </div>
   );
 }
-
-// ─── Main page ────────────────────────────────────────────────────────────────
 
 // ─── New-cycle modal ──────────────────────────────────────────────────────────
 
@@ -232,6 +282,7 @@ export default function DashboardOverviewPage() {
 
   const [stats, setStats]         = useState<DashStats | null>(null);
   const [cycles, setCycles]       = useState<Cycle[]>([]);
+  const [onaResults, setOnaResults] = useState<OnaResults | null>(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
   const [showNewCycle, setShowNewCycle] = useState(false);
@@ -247,12 +298,16 @@ export default function DashboardOverviewPage() {
       fetch(`${API_BASE}/assessments/cycles?organisationId=${orgId}`, { headers }).then(
         (r) => (r.ok ? r.json() : [])
       ),
+      fetch(`${API_BASE}/ona/results/${orgId}`, { headers }).then(
+        (r) => (r.ok ? r.json() : null)
+      ),
     ])
-      .then(([s, c]) => {
+      .then(([s, c, o]) => {
         if (s) setStats(s);
         const list: Cycle[] = Array.isArray(c) ? c : [];
         list.sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
         setCycles(list);
+        if (o) setOnaResults(o);
       })
       .catch(() => {
         setError(lang === "ar" ? "تعذّر تحميل بيانات لوحة التحكم." : "Failed to load dashboard data.");
@@ -448,6 +503,64 @@ export default function DashboardOverviewPage() {
           </div>
         )}
       </section>
+
+      {/* ── Organizational Network Analysis (ONA) ── */}
+      {onaResults && onaResults.insightCards.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+            {lang === "ar" ? "تحليل الشبكة التنظيمية" : "Organizational Network Analysis"}
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {onaResults.insightCards.map((card) => (
+              <div
+                key={card.id}
+                className={`bg-white rounded-2xl border p-5 shadow-sm ${
+                  RISK_BORDER[card.riskLevel] ?? "border-gray-200"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-gray-900">
+                    {lang === "ar" && card.department.nameAr
+                      ? card.department.nameAr
+                      : card.department.name}
+                  </h3>
+                  <span
+                    className={`text-xs font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                      RISK_BADGE[card.riskLevel] ?? "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {lang === "ar"
+                      ? (RISK_LABEL_AR[card.riskLevel] ?? card.riskLevel)
+                      : card.riskLevel}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600">
+                  {lang === "ar" && card.insightTextAr ? card.insightTextAr : card.insightText}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {onaResults.metrics.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+              <p className="text-xs text-gray-400 mb-3">
+                {lang === "ar"
+                  ? "خريطة الشبكة — حجم النقطة يعكس درجة العزلة. خطوط الاتصال ستظهر بعد أول مزامنة حقيقية مع Microsoft 365."
+                  : "Network map — dot size reflects isolation score. Connection lines appear after the first real Microsoft 365 sync."}
+              </p>
+              <OnaGraph
+                nodes={onaResults.metrics.map((m) => ({
+                  id: m.userEmail,
+                  size: 4 + m.isolationScore * 10,
+                  color: colorForDept(m.departmentId),
+                }))}
+                edges={[]}
+              />
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }
