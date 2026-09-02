@@ -803,6 +803,79 @@ function EmployeeListSection({
   );
 }
 
+// ─── Correlation test tool (temporary) ─────────────────────────────────────────
+
+function CorrelationTestSection({
+  orgId, lang, authHeader,
+}: { orgId: string; lang: string; authHeader: () => Record<string, string> }) {
+  const [running, setRunning] = useState(false);
+  const [result,  setResult]  = useState<{ text: string; ok: boolean } | null>(null);
+
+  async function runSeed() {
+    if (!window.confirm(
+      lang === "ar"
+        ? "سيتم إنشاء بيانات اختبار وهمية (أقسام ودورات مغلقة) وتشغيل محرك الارتباط. متابعة؟"
+        : "This will create fake test departments, closed cycles, and network data, then run the correlation engine. Continue?"
+    )) return;
+
+    setRunning(true);
+    setResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/ona/seed-correlation-test/${orgId}`, {
+        method: "POST",
+        headers: authHeader(),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      setResult({
+        text: lang === "ar"
+          ? `تم — تم إنشاء ${data.insightCardsGenerated} بطاقة رؤية. تحقق من علامة تبويب ONA.`
+          : `Done — ${data.insightCardsGenerated} insight cards generated. Check the ONA tab.`,
+        ok: true,
+      });
+    } catch (err: any) {
+      setResult({ text: err.message, ok: false });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-8 mt-6">
+      <h2 className="font-semibold text-gray-800 mb-1">
+        {lang === "ar" ? "أدوات الاختبار — محرك الارتباط" : "Testing Tools — Correlation Engine"}
+      </h2>
+      <p className="text-xs text-gray-400 mb-4">
+        {lang === "ar"
+          ? "أداة مؤقتة للتطوير. تُنشئ ثلاثة أقسام وهمية ببيانات اختبار وتشغّل محرك الارتباط لمعاينة بطاقات الرؤية."
+          : "Temporary dev tool. Creates three fake test departments with sample data and runs the correlation engine so you can preview insight cards."}
+      </p>
+
+      {result && (
+        <div className={[
+          "mb-4 flex items-center gap-2 rounded-xl px-4 py-3 text-sm",
+          result.ok ? "bg-green-50 border border-green-200 text-green-700"
+                     : "bg-red-50 border border-red-200 text-red-700",
+        ].join(" ")}>
+          <span>{result.ok ? "✓" : "✕"}</span>
+          <span className="flex-1">{result.text}</span>
+          <button onClick={() => setResult(null)} className="opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
+      <button
+        onClick={runSeed}
+        disabled={running}
+        className="px-5 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:opacity-60 transition-colors"
+      >
+        {running
+          ? (lang === "ar" ? "جارٍ التشغيل…" : "Running…")
+          : (lang === "ar" ? "إنشاء بيانات اختبار وتشغيل الارتباط" : "Seed Test Data & Run Correlation")}
+      </button>
+    </div>
+  );
+}
+
 function SettingsTab({
   org, lang, t, reload, authHeader,
 }: { org: OrgDetail; lang: string; t: (k: any) => string; reload: () => void; authHeader: () => Record<string, string> }) {
@@ -907,6 +980,7 @@ function SettingsTab({
       </div>
 
       <EmployeeListSection orgId={org.id} lang={lang} authHeader={authHeader} />
+      <CorrelationTestSection orgId={org.id} lang={lang} authHeader={authHeader} />
     </div>
   );
 }
