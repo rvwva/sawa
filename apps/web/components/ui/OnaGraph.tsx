@@ -21,9 +21,10 @@ export interface OnaEdge {
 export interface OnaGraphProps {
   nodes: OnaNode[];
   edges: OnaEdge[];
+  onNodeClick?: (nodeId: string) => void;
 }
 
-function GraphLoader({ nodes, edges }: OnaGraphProps) {
+function GraphLoader({ nodes, edges, onNodeClick }: OnaGraphProps) {
   const loadGraph = useLoadGraph();
   const sigma = useSigma();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
@@ -37,7 +38,7 @@ function GraphLoader({ nodes, edges }: OnaGraphProps) {
         size: node.size ?? 6,
         color: node.color ?? "#6366f1",
         label: "",
-        fullLabel: node.label ?? node.id,
+        fullLabel: node.label ?? "",
       });
     }
     for (const edge of edges) {
@@ -46,9 +47,10 @@ function GraphLoader({ nodes, edges }: OnaGraphProps) {
         graph.hasNode(edge.target) &&
         !graph.hasEdge(edge.source, edge.target)
       ) {
+        const w = edge.weight ?? 1;
         graph.addEdge(edge.source, edge.target, {
-          weight: edge.weight ?? 1,
-          size: 1,
+          weight: w,
+          size: Math.min(1 + w / 5, 8),
           color: "#94a3b8",
         });
       }
@@ -63,20 +65,22 @@ function GraphLoader({ nodes, edges }: OnaGraphProps) {
     sigma.refresh();
   }, [nodes, edges, loadGraph, sigma]);
 
-  // Track which node the mouse is over
   useEffect(() => {
     sigma.on("enterNode", ({ node }) => setHoveredNode(node));
     sigma.on("leaveNode", () => setHoveredNode(null));
+    if (onNodeClick) {
+      sigma.on("clickNode", ({ node }) => onNodeClick(node));
+    }
     return () => {
       sigma.removeAllListeners("enterNode");
       sigma.removeAllListeners("leaveNode");
+      sigma.removeAllListeners("clickNode");
     };
-  }, [sigma]);
+  }, [sigma, onNodeClick]);
 
-  // Reveal the full label only for the hovered node
   useEffect(() => {
     sigma.setSetting("nodeReducer", (node, data) => {
-      if (node === hoveredNode) {
+      if (node === hoveredNode && data.fullLabel) {
         return { ...data, label: data.fullLabel, forceLabel: true, zIndex: 1 };
       }
       return { ...data, label: "" };
@@ -87,13 +91,13 @@ function GraphLoader({ nodes, edges }: OnaGraphProps) {
   return null;
 }
 
-export default function OnaGraph({ nodes, edges }: OnaGraphProps) {
+export default function OnaGraph({ nodes, edges, onNodeClick }: OnaGraphProps) {
   return (
     <SigmaContainer
-      style={{ height: "400px", width: "100%" }}
+      style={{ height: "400px", width: "100%", cursor: onNodeClick ? "pointer" : "default" }}
       settings={{ labelRenderedSizeThreshold: 999, renderEdgeLabels: false }}
     >
-      <GraphLoader nodes={nodes} edges={edges} />
+      <GraphLoader nodes={nodes} edges={edges} onNodeClick={onNodeClick} />
     </SigmaContainer>
   );
 }
