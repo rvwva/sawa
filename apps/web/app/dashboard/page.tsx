@@ -41,18 +41,33 @@ type OnaInsightCardData = {
   signals: string[];
 };
 
-type OnaMetricData = {
-  id: string;
-  userEmail: string;
-  departmentId: string | null;
-  isolationScore: number;
+type OnaDepartmentNode = {
+  departmentId: string;
+  name: string;
+  nameAr?: string | null;
+  employeeCount: number;
+  avgIsolationScore: number;
+  avgReciprocityScore: number;
+};
+
+type OnaDepartmentEdge = {
+  sourceDeptId: string;
+  targetDeptId: string;
+  weight: number;
 };
 
 type OnaResults = {
   onaEnabled: boolean;
   lastSyncAt: string | null;
   insightCards: OnaInsightCardData[];
-  metrics: OnaMetricData[];
+  departmentNodes: OnaDepartmentNode[];
+  departmentEdges: OnaDepartmentEdge[];
+};
+
+type OnaDeptDetail = {
+  department: { name: string; nameAr?: string | null } | null;
+  metrics: { userEmail: string; isolationScore: number; reciprocityScore: number }[];
+  interactions: { fromUserEmail: string; toUserEmail: string; weight: number }[];
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -287,6 +302,11 @@ export default function DashboardOverviewPage() {
   const [error, setError]         = useState("");
   const [showNewCycle, setShowNewCycle] = useState(false);
 
+  // ONA drill-down state
+  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
+  const [deptDetail, setDeptDetail]         = useState<OnaDeptDetail | null>(null);
+  const [deptDetailLoading, setDeptDetailLoading] = useState(false);
+
   const loadData = (orgId: string, token: string) => {
     const headers = { Authorization: `Bearer ${token}` };
     setLoading(true);
@@ -322,6 +342,27 @@ export default function DashboardOverviewPage() {
     loadData(user.organisationId, token);
   }, [user, lang]);
 
+  async function openDepartment(deptId: string) {
+    if (!user) return;
+    setSelectedDeptId(deptId);
+    setDeptDetail(null);
+    setDeptDetailLoading(true);
+    const token = localStorage.getItem("mindlign_token");
+    try {
+      const res = await fetch(`${API_BASE}/ona/results/${user.organisationId}/department/${deptId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setDeptDetail(await res.json());
+    } finally {
+      setDeptDetailLoading(false);
+    }
+  }
+
+  function closeDepartment() {
+    setSelectedDeptId(null);
+    setDeptDetail(null);
+  }
+
   if (loading || !user) {
     return (
       <div className="flex justify-center py-24">
@@ -334,15 +375,6 @@ export default function DashboardOverviewPage() {
   }
 
   const canView = (_status: string) => true;
-
-  // Map departmentId → display name, built from the insight cards
-  const deptNameById: Record<string, string> = {};
-  if (onaResults) {
-    for (const card of onaResults.insightCards) {
-      deptNameById[card.departmentId] =
-        lang === "ar" && card.department.nameAr ? card.department.nameAr : card.department.name;
-    }
-  }
 
   return (
     <div dir={dir(lang)} className="max-w-6xl mx-auto space-y-8">
@@ -551,44 +583,104 @@ export default function DashboardOverviewPage() {
             ))}
           </div>
 
-          {onaResults.metrics.length > 0 && (
+          {onaResults.departmentNodes.length > 0 && (
             <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
-              <p className="text-xs text-gray-400 mb-3">
-                {lang === "ar"
-                  ? "خريطة الشبكة — حجم النقطة يعكس درجة العزلة. خطوط الاتصال ستظهر بعد أول مزامنة حقيقية مع Microsoft 365."
-                  : "Network map — dot size reflects isolation score. Connection lines appear after the first real Microsoft 365 sync."}
-              </p>
 
-              {/* Legend: color → department */}
-              <div className="flex flex-wrap gap-4 mb-4">
-                {onaResults.insightCards.map((card) => (
-                  <div key={card.departmentId} className="flex items-center gap-2 text-xs text-gray-600">
-                    <span
-                      className="w-3 h-3 rounded-full inline-block"
-                      style={{ backgroundColor: colorForDept(card.departmentId) }}
-                    />
-                    {lang === "ar" && card.department.nameAr
-                      ? card.department.nameAr
-                      : card.department.name}
+              {selectedDeptId === null ? (
+                <>
+                  <p className="text-xs text-gray-400 mb-3">
+                    {lang === "ar"
+                      ? "خريطة الشبكة على مستوى الأقسام — حجم النقطة يعكس متوسط العزلة، وسمك الخط يعكس حجم التفاعل بين الأقسام. اضغط على أي قسم لعرض الموظفين داخله."
+                      : "Department-level network map — dot size reflects average isolation, line thickness reflects cross-team interaction volume. Click a department to see the employees inside it."}
+                  </p>
+
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-4 mb-4">
+                    {onaResults.departmentNodes.map((d) => (
+                      <div key={d.departmentId} className="flex items-center gap-2 text-xs text-gray-600">
+                        <span
+                          className="w-3 h-3 rounded-full inline-block"
+                          style={{ backgroundColor: colorForDept(d.departmentId) }}
+                        />
+                        {lang === "ar" && d.nameAr ? d.nameAr : d.name}
+                        <span className="text-gray-400">({d.employeeCount})</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              <OnaGraph
-                nodes={onaResults.metrics.map((m) => ({
-                  id: m.userEmail,
-                  label: m.departmentId ? deptNameById[m.departmentId] ?? "" : "",
-                  size: 4 + m.isolationScore * 10,
-                  color: colorForDept(m.departmentId),
-                }))}
-                edges={[]}
-              />
+                  <OnaGraph
+                    nodes={onaResults.departmentNodes.map((d) => ({
+                      id: d.departmentId,
+                      label: `${lang === "ar" && d.nameAr ? d.nameAr : d.name} (${d.employeeCount})`,
+                      size: 8 + d.avgIsolationScore * 14,
+                      color: colorForDept(d.departmentId),
+                    }))}
+                    edges={onaResults.departmentEdges.map((e) => ({
+                      source: e.sourceDeptId,
+                      target: e.targetDeptId,
+                      weight: e.weight,
+                    }))}
+                    onNodeClick={openDepartment}
+                  />
 
-              <p className="text-xs text-gray-400 mt-3">
-                {lang === "ar"
-                  ? "مرر الفأرة فوق أي نقطة لرؤية اسم القسم."
-                  : "Hover over a dot to see its department."}
-              </p>
+                  <p className="text-xs text-gray-400 mt-3">
+                    {lang === "ar"
+                      ? "مرر الفأرة فوق أي نقطة لرؤية اسم القسم وعدد الموظفين. اضغط للدخول."
+                      : "Hover over a dot to see its department and headcount. Click to drill in."}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={closeDepartment}
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700 mb-3"
+                  >
+                    <svg className={`w-4 h-4 ${lang === "ar" ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    {lang === "ar" ? "العودة إلى الأقسام" : "Back to departments"}
+                  </button>
+
+                  {deptDetailLoading ? (
+                    <div className="flex justify-center py-16">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-500" />
+                    </div>
+                  ) : deptDetail ? (
+                    <>
+                      <h3 className="font-semibold text-gray-900 mb-1">
+                        {lang === "ar" && deptDetail.department?.nameAr
+                          ? deptDetail.department.nameAr
+                          : deptDetail.department?.name}
+                        <span className="text-gray-400 font-normal text-sm ml-2">
+                          ({deptDetail.metrics.length} {lang === "ar" ? "موظف" : "employees"})
+                        </span>
+                      </h3>
+                      <p className="text-xs text-gray-400 mb-3">
+                        {lang === "ar"
+                          ? "لا تُعرض أسماء أو عناوين بريد الموظفين — فقط بنية الشبكة."
+                          : "Individual names or emails are never shown — only network structure."}
+                      </p>
+
+                      <OnaGraph
+                        nodes={deptDetail.metrics.map((m) => ({
+                          id: m.userEmail,
+                          size: 4 + m.isolationScore * 10,
+                          color: colorForDept(selectedDeptId),
+                        }))}
+                        edges={deptDetail.interactions.map((i) => ({
+                          source: i.fromUserEmail,
+                          target: i.toUserEmail,
+                          weight: i.weight,
+                        }))}
+                      />
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-400 text-center py-8">
+                      {lang === "ar" ? "تعذّر تحميل بيانات القسم." : "Failed to load department detail."}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           )}
         </section>
