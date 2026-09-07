@@ -335,6 +335,15 @@ export default function DashboardOverviewPage() {
 
   const canView = (_status: string) => true;
 
+  // Map departmentId → display name, built from the insight cards
+  const deptNameById: Record<string, string> = {};
+  if (onaResults) {
+    for (const card of onaResults.insightCards) {
+      deptNameById[card.departmentId] =
+        lang === "ar" && card.department.nameAr ? card.department.nameAr : card.department.name;
+    }
+  }
+
   return (
     <div dir={dir(lang)} className="max-w-6xl mx-auto space-y-8">
 
@@ -549,14 +558,37 @@ export default function DashboardOverviewPage() {
                   ? "خريطة الشبكة — حجم النقطة يعكس درجة العزلة. خطوط الاتصال ستظهر بعد أول مزامنة حقيقية مع Microsoft 365."
                   : "Network map — dot size reflects isolation score. Connection lines appear after the first real Microsoft 365 sync."}
               </p>
+
+              {/* Legend: color → department */}
+              <div className="flex flex-wrap gap-4 mb-4">
+                {onaResults.insightCards.map((card) => (
+                  <div key={card.departmentId} className="flex items-center gap-2 text-xs text-gray-600">
+                    <span
+                      className="w-3 h-3 rounded-full inline-block"
+                      style={{ backgroundColor: colorForDept(card.departmentId) }}
+                    />
+                    {lang === "ar" && card.department.nameAr
+                      ? card.department.nameAr
+                      : card.department.name}
+                  </div>
+                ))}
+              </div>
+
               <OnaGraph
                 nodes={onaResults.metrics.map((m) => ({
                   id: m.userEmail,
+                  label: m.departmentId ? deptNameById[m.departmentId] ?? "" : "",
                   size: 4 + m.isolationScore * 10,
                   color: colorForDept(m.departmentId),
                 }))}
                 edges={[]}
               />
+
+              <p className="text-xs text-gray-400 mt-3">
+                {lang === "ar"
+                  ? "مرر الفأرة فوق أي نقطة لرؤية اسم القسم."
+                  : "Hover over a dot to see its department."}
+              </p>
             </div>
           )}
         </section>
