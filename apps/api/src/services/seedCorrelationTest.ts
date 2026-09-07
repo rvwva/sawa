@@ -7,6 +7,12 @@
  * with OnaMetric rows — so the correlation engine can be exercised and
  * visually verified without a live Microsoft 365 tenant.
  *
+ * Also seeds a handful of fake OnaInteraction rows: internal chatter
+ * within Sales and Support, one cross-team link between them, and
+ * nothing at all for Engineering — so the department-level network
+ * graph visually shows the same isolation the insight card describes
+ * in text, not just isolated colored dots.
+ *
  * Called from POST /api/ona/seed-correlation-test/:orgId (admin only).
  * Safe to call twice — each seeding step checks for existing data first.
  */
@@ -108,6 +114,53 @@ async function seedOnaMetrics(opts: {
   return count;
 }
 
+/**
+ * Seeds a fixed set of fake OnaInteraction rows: internal chatter within
+ * Sales and Support, one cross-team link between them, nothing at all
+ * touching Engineering — so the isolation the insight card describes in
+ * words is also visible as missing lines on the department graph.
+ */
+async function seedOnaInteractions(orgId: string) {
+  const existing = await prisma.onaInteraction.count({ where: { organisationId: orgId } });
+  if (existing > 0) return 0;
+
+  const sales = (i: number) => `sales.employee${i}@test-correlation.mindlign.com`;
+  const support = (i: number) => `support.employee${i}@test-correlation.mindlign.com`;
+
+  const pairs: Array<{ from: string; to: string; weight: number }> = [
+    // Internal Sales chatter
+    { from: sales(1), to: sales(2), weight: 8 },
+    { from: sales(2), to: sales(3), weight: 6 },
+    { from: sales(3), to: sales(4), weight: 5 },
+    { from: sales(4), to: sales(5), weight: 7 },
+    { from: sales(1), to: sales(6), weight: 4 },
+    // Internal Support chatter
+    { from: support(1), to: support(2), weight: 6 },
+    { from: support(2), to: support(3), weight: 5 },
+    { from: support(3), to: support(4), weight: 4 },
+    // Cross-team: Sales <-> Support
+    { from: sales(1), to: support(1), weight: 3 },
+    { from: sales(3), to: support(2), weight: 2 },
+    // Engineering: intentionally nothing seeded
+  ];
+
+  const periodEnd = new Date();
+  const periodStart = new Date(periodEnd.getTime() - 30 * 24 * 3_600_000);
+
+  await prisma.onaInteraction.createMany({
+    data: pairs.map((p) => ({
+      organisationId: orgId,
+      fromUserEmail: p.from,
+      toUserEmail: p.to,
+      type: "email",
+      weight: p.weight,
+      periodStart,
+      periodEnd,
+    })),
+  });
+  return pairs.length;
+}
+
 export async function seedCorrelationTestData(orgId: string): Promise<{ departments: string[] }> {
   logger.info(`Seeding correlation test data for org ${orgId}`);
 
@@ -130,6 +183,8 @@ export async function seedCorrelationTestData(orgId: string): Promise<{ departme
   await seedClosedCycleScores({ orgId: org.id, departmentId: sales.id, assessmentId: cbi.id, cycleTitle: "Correlation Test — CBI", totals: [28, 32, 30, 35, 27], bandFn: cbiBand, isCbi: true });
   await seedClosedCycleScores({ orgId: org.id, departmentId: sales.id, assessmentId: psychSafety.id, cycleTitle: "Correlation Test — Psychological Safety", totals: [82, 88, 79, 85, 90], bandFn: psychSafetyBand });
   await seedClosedCycleScores({ orgId: org.id, departmentId: sales.id, assessmentId: lmx7.id, cycleTitle: "Correlation Test — LMX-7", totals: [75, 80, 73, 78, 82], bandFn: lmx7Band });
+
+  await seedOnaInteractions(org.id);
 
   logger.info(`Correlation test seed complete for org ${orgId}`);
   return { departments: ["Engineering", "Sales", "Support"] };
