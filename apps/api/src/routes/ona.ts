@@ -9,6 +9,67 @@ import { seedCorrelationTestData } from "../services/seedCorrelationTest";
 
 export const onaRouter = Router();
 
+/**
+ * Finds articulation points (cut vertices) in an undirected graph — nodes
+ * whose removal would split the graph into more disconnected pieces than
+ * it currently has. Standard DFS-based algorithm, O(V + E).
+ *
+ * An isolated node (no edges at all) is never an articulation point —
+ * it's already disconnected, which is a different signal (isolation),
+ * not a structural bridge.
+ */
+function findArticulationPoints(
+  nodeIds: string[],
+  edges: Array<{ from: string; to: string }>
+): Set<string> {
+  const adj = new Map<string, string[]>();
+  for (const id of nodeIds) adj.set(id, []);
+  for (const e of edges) {
+    if (!adj.has(e.from) || !adj.has(e.to) || e.from === e.to) continue;
+    adj.get(e.from)!.push(e.to);
+    adj.get(e.to)!.push(e.from);
+  }
+
+  const visited = new Set<string>();
+  const disc = new Map<string, number>();
+  const low = new Map<string, number>();
+  const parent = new Map<string, string | null>();
+  const articulationPoints = new Set<string>();
+  let timer = 0;
+
+  function dfs(u: string) {
+    visited.add(u);
+    disc.set(u, timer);
+    low.set(u, timer);
+    timer++;
+    let children = 0;
+
+    for (const v of adj.get(u) ?? []) {
+      if (!visited.has(v)) {
+        children++;
+        parent.set(v, u);
+        dfs(v);
+        low.set(u, Math.min(low.get(u)!, low.get(v)!));
+
+        const isRoot = parent.get(u) === null || parent.get(u) === undefined;
+        if (isRoot && children > 1) articulationPoints.add(u);
+        if (!isRoot && low.get(v)! >= disc.get(u)!) articulationPoints.add(u);
+      } else if (v !== parent.get(u)) {
+        low.set(u, Math.min(low.get(u)!, disc.get(v)!));
+      }
+    }
+  }
+
+  for (const id of nodeIds) {
+    if (!visited.has(id)) {
+      parent.set(id, null);
+      dfs(id);
+    }
+  }
+
+  return articulationPoints;
+}
+
 // ── Save M365 credentials for an org (admin only) ────────────────────────────
 onaRouter.post(
   "/connect/:orgId",
@@ -75,7 +136,7 @@ onaRouter.get("/results/:orgId", requireAuth, async (req, res) => {
         where: { organisationId: orgId },
         include: { department: true },
         orderBy: [
-          { riskLevel: "asc" }, // urgent first (alphabetically before healthy/moderate)
+          { riskLevel: "asc" },
           { createdAt: "desc" },
         ],
       }),
@@ -97,11 +158,9 @@ onaRouter.get("/results/:orgId", requireAuth, async (req, res) => {
       }),
     ]);
 
-    // Map each employee to their department, for aggregating interactions
     const deptByEmail = new Map<string, string | null>();
     for (const m of metrics) deptByEmail.set(m.userEmail, m.departmentId);
 
-    // Average isolation/reciprocity per department
     const deptStats = new Map<string, { count: number; isolationSum: number; reciprocitySum: number }>();
     for (const m of metrics) {
       if (!m.departmentId) continue;
@@ -126,7 +185,6 @@ onaRouter.get("/results/:orgId", requireAuth, async (req, res) => {
         };
       });
 
-    // Aggregate interactions into cross-department edges only (weight summed both ways)
     const edgeWeights = new Map<string, number>();
     for (const i of interactions) {
       const fromDept = deptByEmail.get(i.fromUserEmail);
@@ -182,7 +240,22 @@ onaRouter.get("/results/:orgId/department/:deptId", requireAuth, async (req, res
         })
       : [];
 
-    res.json({ department, metrics, interactions });
+    const bridgeSet = findArticulationPoints(
+      emails,
+      interactions.map((i) => ({ from: i.fromUserEmail, to: i.toUserEmail }))
+    );
+
+    const metricsWithBridge = metrics.map((m) => ({
+      ...m,
+      isBridge: bridgeSet.has(m.userEmail),
+    }));
+
+    res.json({
+      department,
+      metrics: metricsWithBridge,
+      interactions,
+      bridgeCount: bridgeSet.size,
+    });
   } catch (err) {
     logger.error("ONA department drill-down fetch failed", { err });
     res.status(500).json({ error: "Failed to fetch department detail" });
