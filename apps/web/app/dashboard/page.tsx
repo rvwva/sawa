@@ -66,8 +66,9 @@ type OnaResults = {
 
 type OnaDeptDetail = {
   department: { name: string; nameAr?: string | null } | null;
-  metrics: { userEmail: string; isolationScore: number; reciprocityScore: number }[];
+  metrics: { userEmail: string; isolationScore: number; reciprocityScore: number; isBridge: boolean }[];
   interactions: { fromUserEmail: string; toUserEmail: string; weight: number }[];
+  bridgeCount: number;
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -104,6 +105,7 @@ const RISK_LABEL_AR: Record<string, string> = {
 };
 
 const DEPT_PALETTE = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#06b6d4", "#8b5cf6"];
+const BRIDGE_COLOR = "#dc2626";
 
 function colorForDept(deptId: string | null): string {
   if (!deptId) return "#94a3b8";
@@ -219,7 +221,7 @@ function NewCycleModal({
         </div>
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           {err && (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-700 text-sm">{err}</div>
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{err}</div>
           )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t("admin_cycle_type")}</label>
@@ -594,7 +596,6 @@ export default function DashboardOverviewPage() {
                       : "Department-level network map — dot size reflects average isolation, line thickness reflects cross-team interaction volume. Click a department to see the employees inside it."}
                   </p>
 
-                  {/* Legend */}
                   <div className="flex flex-wrap gap-4 mb-4">
                     {onaResults.departmentNodes.map((d) => (
                       <div key={d.departmentId} className="flex items-center gap-2 text-xs text-gray-600">
@@ -655,17 +656,28 @@ export default function DashboardOverviewPage() {
                           ({deptDetail.metrics.length} {lang === "ar" ? "موظف" : "employees"})
                         </span>
                       </h3>
-                      <p className="text-xs text-gray-400 mb-3">
+                      <p className="text-xs text-gray-400 mb-1">
                         {lang === "ar"
                           ? "لا تُعرض أسماء أو عناوين بريد الموظفين — فقط بنية الشبكة."
                           : "Individual names or emails are never shown — only network structure."}
                       </p>
 
+                      {deptDetail.bridgeCount > 0 && (
+                        <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mb-3 mt-2">
+                          <span className="w-2.5 h-2.5 rounded-full inline-block mt-1 shrink-0" style={{ backgroundColor: BRIDGE_COLOR }} />
+                          <p className="text-xs text-red-700">
+                            {lang === "ar"
+                              ? `${deptDetail.bridgeCount} من ${deptDetail.metrics.length} موظفين يمثلون نقاط اتصال حرجة — إذا غادر أي منهم، قد تنقسم الشبكة إلى مجموعات منفصلة.`
+                              : `${deptDetail.bridgeCount} of ${deptDetail.metrics.length} employees are structural bridges (shown in red) — if either left, the network could split into disconnected groups.`}
+                          </p>
+                        </div>
+                      )}
+
                       <OnaGraph
                         nodes={deptDetail.metrics.map((m) => ({
                           id: m.userEmail,
                           size: 4 + m.isolationScore * 10,
-                          color: colorForDept(selectedDeptId),
+                          color: m.isBridge ? BRIDGE_COLOR : colorForDept(selectedDeptId),
                         }))}
                         edges={deptDetail.interactions.map((i) => ({
                           source: i.fromUserEmail,
