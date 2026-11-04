@@ -4,8 +4,9 @@ import jwt from "jsonwebtoken";
 export interface AuthPayload {
   userId: string;
   email: string;
-  role: "ADMIN" | "EXECUTIVE" | "EMPLOYEE";
+  role: "ADMIN" | "EXECUTIVE" | "EMPLOYEE" | "MANAGER";
   organisationId: string | null;
+  departmentId?: string | null;
 }
 
 declare global {

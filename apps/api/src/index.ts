@@ -15,6 +15,7 @@ import { usersRouter } from "./routes/users";
 import { adminRouter } from "./routes/admin";
 import { dataRightsRouter } from "./routes/dataRights";
 import { onaRouter } from "./routes/ona";
+import { plansRouter } from "./routes/plans";
 import { errorHandler } from "./middleware/errorHandler";
 import { logger } from "./lib/logger";
 import { checkDatabaseConnection } from "./lib/prisma";
@@ -67,6 +68,7 @@ app.use("/api/users", usersRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/data-rights", dataRightsRouter);
 app.use("/api/ona", onaRouter);
+app.use("/api/plans", plansRouter);
 
 app.get("/api/health", async (_req, res) => {
   const dbOk = await checkDatabaseConnection();
