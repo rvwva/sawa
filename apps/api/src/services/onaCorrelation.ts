@@ -34,6 +34,7 @@
 
 import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
+import { MIN_DEPT_RESPONDENTS } from "./scoring";
 
 const MIN_DEPT_SIZE_FOR_ONA = 5;
 
@@ -248,7 +249,9 @@ export async function runOnaCorrelation(orgId: string, triggeredByCycleId?: stri
     // ── Scale signals — type-qualified, direction-aware ──────────────
     for (const [scaleKey, def] of Object.entries(SCALE_SIGNALS)) {
       const values = deptScores?.get(scaleKey);
-      if (!values || values.length === 0) continue;
+      // Require at least MIN_DEPT_RESPONDENTS score samples before drawing
+      // any signal — the same anonymity floor used for all other breakdowns.
+      if (!values || values.length < MIN_DEPT_RESPONDENTS) continue;
       const scaleAvg = avg(values);
 
       // Urgent threshold: stand-alone upgrade to urgent (e.g. CBI ≥75 = severe burnout).
@@ -341,6 +344,21 @@ export function classifyScaleScore(
       : score <= def.riskThreshold;
 
   return isRisk ? "risk" : "healthy";
+}
+
+/**
+ * Same as classifyScaleScore but takes a raw array of respondent scores.
+ * Returns null when the array is below MIN_DEPT_RESPONDENTS — no signal is
+ * drawn, matching the anonymity guard in the correlation loop. Exported for
+ * unit testing.
+ */
+export function classifyScaleScores(
+  scaleKey: string,
+  values: number[]
+): "urgent" | "risk" | "healthy" | null {
+  if (values.length < MIN_DEPT_RESPONDENTS) return null;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  return classifyScaleScore(scaleKey, mean);
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────

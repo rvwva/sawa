@@ -11,7 +11,7 @@
  * Prisma or Express dependency here.
  */
 
-import { classifyScaleScore } from "../services/onaCorrelation";
+import { classifyScaleScore, classifyScaleScores } from "../services/onaCorrelation";
 
 // ─── CBI:total ─────────────────────────────────────────────────────────────
 
@@ -78,6 +78,18 @@ describe("TURNOVER:total — higher_is_worse, risk ≥60", () => {
 
   it("score 100 → risk", () => {
     expect(classifyScaleScore("TURNOVER:total", 100)).toBe("risk");
+  });
+});
+
+// ─── Minimum respondent floor (anonymity guard) ────────────────────────────
+
+describe("classifyScaleScores — MIN_DEPT_RESPONDENTS floor", () => {
+  it("4 CBI scores of 90 → null (below minimum, no signal emitted)", () => {
+    expect(classifyScaleScores("CBI:total", [90, 90, 90, 90])).toBeNull();
+  });
+
+  it("5 CBI scores of 90 → urgent (above minimum, signal emitted)", () => {
+    expect(classifyScaleScores("CBI:total", [90, 90, 90, 90, 90])).toBe("urgent");
   });
 });
 
