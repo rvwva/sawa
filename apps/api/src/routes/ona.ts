@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
-import { requireRole } from "../middleware/rbac";
+import { requireRole, canAccessOrg } from "../middleware/rbac";
 import { prisma } from "../lib/prisma";
 import { runOnaSync } from "../services/onaSync";
 import { runOnaCorrelation } from "../services/onaCorrelation";
@@ -127,9 +127,17 @@ onaRouter.post(
 );
 
 // ── Get ONA results for dashboard — department-level summary ─────────────────
-onaRouter.get("/results/:orgId", requireAuth, async (req, res) => {
+onaRouter.get(
+  "/results/:orgId",
+  requireAuth,
+  requireRole("ADMIN", "EXECUTIVE"),
+  async (req, res) => {
   try {
     const { orgId } = req.params;
+
+    if (!canAccessOrg(req.user!, orgId)) {
+      return res.status(403).json({ error: "Access denied: not your organisation" });
+    }
 
     const [insightCards, metrics, interactions, departments, org] = await Promise.all([
       prisma.onaInsightCard.findMany({
@@ -212,9 +220,26 @@ onaRouter.get("/results/:orgId", requireAuth, async (req, res) => {
 });
 
 // ── Drill down into one department's individual network ──────────────────────
-onaRouter.get("/results/:orgId/department/:deptId", requireAuth, async (req, res) => {
+onaRouter.get(
+  "/results/:orgId/department/:deptId",
+  requireAuth,
+  requireRole("ADMIN", "EXECUTIVE"),
+  async (req, res) => {
   try {
     const { orgId, deptId } = req.params;
+
+    if (!canAccessOrg(req.user!, orgId)) {
+      return res.status(403).json({ error: "Access denied: not your organisation" });
+    }
+
+    // Verify deptId belongs to orgId — prevents cross-org department enumeration
+    const deptOwner = await prisma.department.findFirst({
+      where: { id: deptId, organisationId: orgId },
+      select: { id: true },
+    });
+    if (!deptOwner) {
+      return res.status(404).json({ error: "Department not found in this organisation" });
+    }
 
     const [metrics, department] = await Promise.all([
       prisma.onaMetric.findMany({

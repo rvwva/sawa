@@ -321,6 +321,7 @@ export default function CycleDetailPage() {
   const [copiedLink,     setCopiedLink]     = useState(false);
   const [onaData,        setOnaData]        = useState<OnaResults | null>(null);
   const [onaLoading,     setOnaLoading]     = useState(false);
+  const [onaForbidden,   setOnaForbidden]   = useState(false);
 
   const loadAll = useCallback(() => {
     const token = localStorage.getItem("mindlign_token");
@@ -405,7 +406,10 @@ export default function CycleDetailPage() {
     fetch(`${API_BASE}/ona/results/${cycleResult.organisation.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => {
+        if (r.status === 403) { setOnaForbidden(true); return null; }
+        return r.ok ? r.json() : null;
+      })
       .then((data) => { if (data?.onaEnabled) setOnaData(data); })
       .catch(() => {})
       .finally(() => setOnaLoading(false));
@@ -905,7 +909,7 @@ export default function CycleDetailPage() {
       )}
 
       {/* ── F) ONA — Organisational Network Analysis ── */}
-      {(onaData || onaLoading) && (
+      {(onaData || onaLoading || onaForbidden) && (
         <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100">
             <h2 className="text-base font-semibold text-gray-900">
@@ -919,7 +923,13 @@ export default function CycleDetailPage() {
             )}
           </div>
 
-          {onaLoading && !onaData && (
+          {onaForbidden && (
+            <div className="px-6 py-8 text-center text-sm text-gray-500">
+              {lang === "ar" ? "ليس لديك صلاحية لعرض هذه النتائج." : "You don't have access to these results."}
+            </div>
+          )}
+
+          {onaLoading && !onaData && !onaForbidden && (
             <div className="flex justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500" />
             </div>
