@@ -20,6 +20,18 @@ export function requireRole(...roles: Role[]) {
 }
 
 /**
+ * Returns true if the user is allowed to read data for the given organisation.
+ * - ADMIN: always true (platform-wide access).
+ * - EXECUTIVE: true only when orgId matches their own organisation.
+ * - EMPLOYEE and any other role: always false.
+ */
+export function canAccessOrg(user: AuthPayload, orgId: string): boolean {
+  if (user.role === "ADMIN") return true;
+  if (user.role === "EXECUTIVE") return user.organisationId === orgId;
+  return false;
+}
+
+/**
  * Ensure that an EXECUTIVE user can only access data for their own organisation.
  * Admins bypass this check.
  */

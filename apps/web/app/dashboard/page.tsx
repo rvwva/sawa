@@ -300,6 +300,7 @@ export default function DashboardOverviewPage() {
   const [stats, setStats]         = useState<DashStats | null>(null);
   const [cycles, setCycles]       = useState<Cycle[]>([]);
   const [onaResults, setOnaResults] = useState<OnaResults | null>(null);
+  const [onaForbidden, setOnaForbidden] = useState(false);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
   const [showNewCycle, setShowNewCycle] = useState(false);
@@ -321,7 +322,10 @@ export default function DashboardOverviewPage() {
         (r) => (r.ok ? r.json() : [])
       ),
       fetch(`${API_BASE}/ona/results/${orgId}`, { headers }).then(
-        (r) => (r.ok ? r.json() : null)
+        (r) => {
+          if (r.status === 403) { setOnaForbidden(true); return null; }
+          return r.ok ? r.json() : null;
+        }
       ),
     ])
       .then(([s, c, o]) => {
@@ -548,7 +552,17 @@ export default function DashboardOverviewPage() {
       </section>
 
       {/* ── Organizational Network Analysis (ONA) ── */}
-      {onaResults && onaResults.insightCards.length > 0 && (
+      {onaForbidden && (
+        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-2">
+            {lang === "ar" ? "تحليل الشبكة التنظيمية" : "Organizational Network Analysis"}
+          </h2>
+          <p className="text-sm text-gray-500">
+            {lang === "ar" ? "ليس لديك صلاحية لعرض هذه النتائج." : "You don't have access to these results."}
+          </p>
+        </section>
+      )}
+      {!onaForbidden && onaResults && onaResults.insightCards.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold text-gray-800 mb-4">
             {lang === "ar" ? "تحليل الشبكة التنظيمية" : "Organizational Network Analysis"}
