@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthPayload } from "./auth";
 
-type Role = "ADMIN" | "EXECUTIVE" | "EMPLOYEE";
+type Role = "ADMIN" | "EXECUTIVE" | "EMPLOYEE" | "MANAGER";
 
 /**
  * Require one of the given roles to access a route.

@@ -17,6 +17,7 @@ enum UserRole {
   ADMIN // Sawa platform admin — full access
   EXECUTIVE // HR/Executive client — their org only
   EMPLOYEE // Anonymous respondent — no login required
+  MANAGER // Department manager — plan access only
 }
 
 enum AssessmentType {
@@ -56,6 +57,56 @@ enum AuditAction {
   DATA_EXPORT
   DATA_DELETED
   ROLE_CHANGED
+  PLAN_GENERATED
+  PLAN_APPROVED
+  STEP_UPDATED
+  STEP_EDITED
+}
+
+enum PlanPriority {
+  HIGH
+  MEDIUM
+  STANDARD
+}
+
+enum PlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum StepOwnerRole {
+  MANAGER
+  HR
+  SPONSOR
+  TEAM
+}
+
+enum StepState {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+  NEEDS_SUPPORT
+  ADAPTED
+}
+
+enum StepVerification {
+  NONE
+  CALENDAR_ONE_TO_ONE
+  CALENDAR_MEETING_LOAD
+  PULSE
+}
+
+enum StepUpdateType {
+  DONE
+  NOT_YET
+  NEEDS_SUPPORT
+  ADAPTED
+  ACKNOWLEDGED
+  SUPPORT_OFFERED
+  REOPENED
+  COMMENT
 }
 
 enum TenureRange {
@@ -102,6 +153,7 @@ model Organisation {
   onaMetrics      OnaMetric[]
   onaInsightCards OnaInsightCard[]
   onaConsentLogs  OnaConsentLog[]
+  actionPlans     ActionPlan[]
 
   @@map("organisations")
 }
@@ -117,6 +169,8 @@ model Department {
   respondents     Respondent[]
   onaMetrics      OnaMetric[]
   onaInsightCards OnaInsightCard[]
+  users           User[]           @relation("UserDepartment")
+  actionPlans     ActionPlan[]
 
   @@map("departments")
 }
@@ -126,6 +180,7 @@ model Department {
 model User {
   id             String    @id @default(cuid())
   organisationId String?   @map("organisation_id")
+  departmentId   String?   @map("department_id")
   email          String    @unique
   passwordHash   String    @map("password_hash")
   firstName      String    @map("first_name")
@@ -138,8 +193,11 @@ model User {
   deletedAt      DateTime? @map("deleted_at")
 
   organisation  Organisation?  @relation(fields: [organisationId], references: [id])
+  department    Department?    @relation("UserDepartment", fields: [departmentId], references: [id])
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
+  approvedPlans ActionPlan[]   @relation("PlanApprover")
+  stepUpdates   StepUpdate[]
 
   @@map("users")
 }
@@ -434,4 +492,68 @@ model OnaConsentLog {
   organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
 
   @@map("ona_consent_logs")
+}
+
+// ─── Action Plans ────────────────────────────────────────────────────────────
+
+model ActionPlan {
+  id             String       @id @default(cuid())
+  organisationId String       @map("organisation_id")
+  departmentId   String?      @map("department_id") // null = org-wide (e.g. MEASUREMENT_GAP)
+  templateKey    String       @map("template_key")
+  priority       PlanPriority
+  status         PlanStatus   @default(DRAFT)
+  titleEn        String       @map("title_en")
+  titleAr        String       @map("title_ar")
+  approvedById   String?      @map("approved_by_id")
+  approvedAt     DateTime?    @map("approved_at")
+  dueAt          DateTime?    @map("due_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  approvedBy   User?        @relation("PlanApprover", fields: [approvedById], references: [id])
+  steps        ActionStep[]
+
+  @@index([organisationId])
+  @@map("action_plans")
+}
+
+model ActionStep {
+  id            String           @id @default(cuid())
+  planId        String           @map("plan_id")
+  order         Int
+  titleEn       String           @map("title_en")
+  titleAr       String           @map("title_ar")
+  bodyEn        String           @map("body_en")
+  bodyAr        String           @map("body_ar")
+  ownerRole     StepOwnerRole    @map("owner_role")
+  dueOffsetDays Int              @map("due_offset_days")
+  dueAt         DateTime?        @map("due_at")
+  state         StepState        @default(NOT_STARTED)
+  verification  StepVerification @default(NONE)
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  plan    ActionPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  updates StepUpdate[]
+
+  @@index([planId])
+  @@map("action_steps")
+}
+
+model StepUpdate {
+  id        String         @id @default(cuid())
+  stepId    String         @map("step_id")
+  userId    String         @map("user_id")
+  type      StepUpdateType
+  note      String?
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  step ActionStep @relation(fields: [stepId], references: [id], onDelete: Restrict)
+  user User       @relation(fields: [userId], references: [id])
+
+  @@index([stepId])
+  @@map("step_updates")
 }
