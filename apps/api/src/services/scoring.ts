@@ -6,15 +6,15 @@
  * that already ran at submission time and persisted results into `scores`.
  *
  * Key rules:
- *  - Department breakdowns only returned when respondentCount >= 1 (TESTING — change back to 5 before production)
+ *  - Department breakdowns only returned when respondentCount >= MIN_DEPT_RESPONDENTS (5)
  *  - All scores are on a 0–100 normalised scale
  */
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 
-// TODO: change back to 5 before production (PDPL anonymity requirement)
-export const MIN_DEPT_RESPONDENTS = 1;
+// PDPL anonymity requirement: groups of fewer than 5 respondents are suppressed.
+export const MIN_DEPT_RESPONDENTS = 5;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

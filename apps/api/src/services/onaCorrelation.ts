@@ -47,36 +47,42 @@ type Direction = "higher_is_worse" | "higher_is_better";
 
 interface ScaleSignalDef {
   direction: Direction;
-  riskThreshold: number; // crossing this in the "bad" direction = risk signal
+  riskThreshold: number;   // crossing this in the "bad" direction = risk signal (inclusive)
+  urgentThreshold?: number; // crossing this in the "bad" direction = urgent on its own (inclusive)
   healthyThreshold: number; // crossing this in the "good" direction = positive signal
   riskSignalKey: string;
 }
 
 // Keyed by `${AssessmentType}:${subscale}` — must match the literal
 // subscale keys written by packages/scoring/definitions/*.ts exactly.
-const SCALE_SIGNALS: Record<string, ScaleSignalDef> = {
+export const SCALE_SIGNALS: Record<string, ScaleSignalDef> = {
   "CBI:total": {
     direction: "higher_is_worse",
-    riskThreshold: 65, // CBI "High" band floor
+    // CBI manual (Kristensen et al. 2005): ≥50 = high burnout, ≥75 = severe burnout.
+    riskThreshold: 50,
+    urgentThreshold: 75, // severe burnout — urgent on its own, no second signal required
     healthyThreshold: 40,
     riskSignalKey: "elevated_burnout",
   },
   "PSYCH_SAFETY:total": {
     direction: "higher_is_better",
-    riskThreshold: 49, // "Low" band ceiling
-    healthyThreshold: 75, // "Healthy" band floor
+    // Product convention — no published cut-off; ≤49 matches the "Low" band in definitions.
+    riskThreshold: 49,
+    healthyThreshold: 75,
     riskSignalKey: "low_psych_safety",
   },
   "TURNOVER:total": {
     direction: "higher_is_worse",
-    riskThreshold: 60, // "High" band floor
+    // Product convention — no published cut-off; ≥60 matches the "High" band in definitions.
+    riskThreshold: 60,
     healthyThreshold: 30,
     riskSignalKey: "high_turnover_intention",
   },
   "LMX7:total": {
     direction: "higher_is_better",
-    riskThreshold: 44, // "Low" band ceiling
-    healthyThreshold: 70, // "Healthy" band floor
+    // Product convention — no published cut-off; ≤44 matches the "Low" band in definitions.
+    riskThreshold: 44,
+    healthyThreshold: 70,
     riskSignalKey: "weak_manager_relationship",
   },
 };
@@ -245,12 +251,26 @@ export async function runOnaCorrelation(orgId: string, triggeredByCycleId?: stri
       if (!values || values.length === 0) continue;
       const scaleAvg = avg(values);
 
+      // Urgent threshold: stand-alone upgrade to urgent (e.g. CBI ≥75 = severe burnout).
+      if (def.urgentThreshold != null) {
+        const isScaleUrgent =
+          def.direction === "higher_is_worse"
+            ? scaleAvg >= def.urgentThreshold
+            : scaleAvg <= def.urgentThreshold;
+        if (isScaleUrgent) {
+          signals.push(def.riskSignalKey);
+          riskLevel = "urgent";
+          continue;
+        }
+      }
+
+      // Band edges are inclusive — use >= / <= so the threshold value itself triggers.
       const isRisk =
-        def.direction === "higher_is_worse" ? scaleAvg > def.riskThreshold : scaleAvg < def.riskThreshold;
+        def.direction === "higher_is_worse" ? scaleAvg >= def.riskThreshold : scaleAvg <= def.riskThreshold;
 
       if (isRisk) {
         signals.push(def.riskSignalKey);
-        riskLevel = "moderate";
+        if (riskLevel !== "urgent") riskLevel = "moderate";
         if (SIGNAL_PHRASES[def.riskSignalKey]?.urgentEligible) {
           urgentEligible.push(def.riskSignalKey);
         }
@@ -293,7 +313,37 @@ export async function runOnaCorrelation(orgId: string, triggeredByCycleId?: stri
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────
+// ─── Pure helpers (exported for tests) ───────────────────────────────────────
+
+/**
+ * Classify a single department-average score for a given scale key.
+ * Returns "urgent" | "risk" | "healthy" using the same inclusive comparisons
+ * as the correlation loop above. Exported for unit testing.
+ */
+export function classifyScaleScore(
+  scaleKey: string,
+  score: number
+): "urgent" | "risk" | "healthy" {
+  const def = SCALE_SIGNALS[scaleKey];
+  if (!def) return "healthy";
+
+  if (def.urgentThreshold != null) {
+    const isUrgent =
+      def.direction === "higher_is_worse"
+        ? score >= def.urgentThreshold
+        : score <= def.urgentThreshold;
+    if (isUrgent) return "urgent";
+  }
+
+  const isRisk =
+    def.direction === "higher_is_worse"
+      ? score >= def.riskThreshold
+      : score <= def.riskThreshold;
+
+  return isRisk ? "risk" : "healthy";
+}
+
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 
 function avg(values: number[]): number {
   if (values.length === 0) return 0;
