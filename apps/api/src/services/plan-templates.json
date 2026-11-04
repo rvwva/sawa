@@ -1,0 +1,1047 @@
+{
+  "version": 1,
+  "generated": "2026-11-03",
+  "note": "Mindlign action plan templates. Content comes from the Mindlign Recommendation Evidence Library. Do not reword step text in code; edit this file instead.",
+  "placeholders": {
+    "{department}": "The department the plan is for (Department.name, or nameAr for Arabic).",
+    "{partner_department}": "The department paired for joint sessions: by default the other department with the highest isolation score; HR can change it when approving the plan."
+  },
+  "evidenceLevels": {
+    "Strong": {
+      "en": "Strong",
+      "ar": "قوية"
+    },
+    "Moderate": {
+      "en": "Moderate",
+      "ar": "متوسطة"
+    },
+    "Practice": {
+      "en": "Practice",
+      "ar": "ممارسة مهنية"
+    },
+    "Hypothesis": {
+      "en": "Mindlign hypothesis",
+      "ar": "فرضية Mindlign"
+    },
+    "Operational": {
+      "en": "Operational",
+      "ar": "إجراء تنظيمي"
+    }
+  },
+  "sources": {
+    "bes": {
+      "label": "Bes et al., 2023",
+      "url": "https://ouci.dntb.gov.ua/works/4Lwq83W7"
+    },
+    "pan": {
+      "label": "Panagioti et al., 2017",
+      "url": "https://research.manchester.ac.uk/en/publications/controlled-interventions-to-reduce-burnout-in-physicians-a-system/"
+    },
+    "moen": {
+      "label": "Moen et al., 2016",
+      "url": "https://experts.umn.edu/en/publications/does-a-flexibilitysupport-organizational-initiative-improve-high-/"
+    },
+    "laker": {
+      "label": "Laker et al., 2022",
+      "url": "https://sloanreview.mit.edu/article/the-surprising-impact-of-meeting-free-days"
+    },
+    "cross": {
+      "label": "Cross et al., 2016",
+      "url": "https://www.pathology.med.umich.edu/static/apps/cms/news/739/Collaboration_Grant.HBR2016.PDF"
+    },
+    "castro": {
+      "label": "Castro et al., 2022",
+      "url": "https://www.hec.edu/sites/default/files/documents/Castro%20&%20Englmaier%20&%20Guadalupe%20-%20Fostering%20Psychological%20Safety%20in%20Teams.pdf"
+    },
+    "flin": {
+      "label": "Flinchum, 2022",
+      "url": "https://graduateschool.charlotte.edu/?p=3491"
+    },
+    "lac": {
+      "label": "Lacerenza et al., 2017",
+      "url": "https://stars.library.ucf.edu/scopus2015/5360"
+    },
+    "scan": {
+      "label": "Scandura & Graen, 1984",
+      "url": "https://scholarship.miami.edu/esploro/outputs/journalArticle/Moderating-effects-of-initial-leader-member-exchange/991031613832302976"
+    },
+    "lone": {
+      "label": "Occupational Medicine, 2023",
+      "url": "https://read.qxmd.com/read/38285544/loneliness-in-the-workplace-a-mixed-method-systematic-review-and-meta-analysis"
+    },
+    "yang": {
+      "label": "Yang et al., 2021",
+      "url": "https://www.microsoft.com/en-us/research/?p=772330"
+    },
+    "fleming": {
+      "label": "Fleming, 2024",
+      "url": "https://www.news-medical.net/news/20240110/Individual-wellbeing-interventions-not-beneficial-for-employees-study-finds.aspx"
+    },
+    "mdpi": {
+      "label": "MDPI review, 2026",
+      "url": "https://www.mdpi.com/1660-4601/23/5/556"
+    },
+    "topa": {
+      "label": "Topa Cantisano et al., 2008",
+      "url": "https://reunido.uniovi.es/index.php/PST/article/view/8687"
+    },
+    "stajk": {
+      "label": "Stajkovic & Luthans, 2003",
+      "url": "https://goal-lab.psych.umn.edu/orgpsych/readings/5.%20Motivation/Stajkovic%20&%20Luthans%20(2003).pdf"
+    },
+    "cbi": {
+      "label": "CBI manual",
+      "url": "https://nfa.dk/media/hl5nbers/cbi-first-edition.pdf"
+    },
+    "aron": {
+      "label": "Aronsson et al., 2017",
+      "url": "https://doaj.org/article/a2c947bf60f444fb97da0c7b37e97f43"
+    },
+    "act": {
+      "label": "Action planning study",
+      "url": "https://econtent.hogrefe.com/doi/10.1027/1866-5888/a000285"
+    },
+    "gal": {
+      "label": "Galesic & Bosnjak, 2009",
+      "url": "https://ojs.ub.uni-konstanz.de/srm/article/download/8348/7668?inline=1"
+    },
+    "baxter": {
+      "label": "Baxter et al., 2016",
+      "url": "https://eprints.whiterose.ac.uk/97062/"
+    },
+    "andersen": {
+      "label": "Andersen et al., 2025",
+      "url": "https://link.springer.com/article/10.1186/s12889-025-25085-x"
+    },
+    "jiang": {
+      "label": "Jiang & Luo, 2018",
+      "url": "https://instituteforpr.org/crafting-employee-trust-from-authenticity-transparency-to-engagement"
+    }
+  },
+  "templates": [
+    {
+      "key": "WORKLOAD_MANAGER_CONNECTION",
+      "trigger": {
+        "all": [
+          "burnout_elevated"
+        ],
+        "any": [
+          "high_isolation",
+          "low_manager_reciprocity"
+        ],
+        "priority": "HIGH",
+        "note": "Burnout at 50 or more plus at least one serious network signal."
+      },
+      "title": {
+        "en": "{department}: reduce workload, restore manager contact and reconnect with other teams",
+        "ar": "{department}: تخفيف عبء العمل، واستعادة التواصل مع المدير، وإعادة الربط بالفرق الأخرى"
+      },
+      "intro": {
+        "en": "Merged plan for burnout, isolation and low manager contact. Work conditions come first because demands and low control are the main drivers of exhaustion; the manager and connection workstreams run alongside.",
+        "ar": "خطة مدمجة للاحتراق الوظيفي والعزلة وضعف التواصل مع المدير. تأتي ظروف العمل أولاً لأن ضغط المتطلبات وضعف التحكم هما المحركان الرئيسيان للإنهاك، ويسير مسارا المدير والتواصل بالتوازي."
+      },
+      "doneWhen": {
+        "en": "Both reductions and the working-time agreement still hold after 4 weeks, one-to-ones happen every week or two, burnout falls below 50 over two survey rounds, isolation moves toward 54 and manager contact rises above 30.",
+        "ar": "استمرار التخفيضين واتفاق وقت العمل بعد 4 أسابيع، وانتظام اللقاءات الفردية كل أسبوع أو أسبوعين، وانخفاض الاحتراق إلى أقل من 50 خلال جولتين، واتجاه العزلة نحو 54، وارتفاع التواصل مع المدير فوق 30."
+      },
+      "watchFor": {
+        "en": [
+          {
+            "text": "Resilience or wellbeing workshops as the main response. Individual programmes on their own showed no benefit in 46,336 UK workers.",
+            "sourceKeys": [
+              "fleming"
+            ]
+          },
+          {
+            "text": "Letting changes slip after a few weeks. Gains from burnout interventions often fade after the short term.",
+            "sourceKeys": [
+              "mdpi"
+            ]
+          },
+          {
+            "text": "Mandatory social events presented as the fix for isolation.",
+            "sourceKeys": []
+          },
+          {
+            "text": "Using network data to judge individuals, or asking anyone to discuss their own burnout in front of the team. Anyone who needs personal support is referred privately to the employee assistance programme.",
+            "sourceKeys": []
+          }
+        ],
+        "ar": [
+          {
+            "text": "ورش المرونة النفسية أو العافية كاستجابة رئيسية. فالبرامج الفردية وحدها لم تُظهر أي فائدة لدى 46,336 موظفاً في المملكة المتحدة.",
+            "sourceKeys": [
+              "fleming"
+            ]
+          },
+          {
+            "text": "التراخي في التغييرات بعد أسابيع قليلة، فمكاسب تدخلات الاحتراق كثيراً ما تتلاشى بعد المدى القصير.",
+            "sourceKeys": [
+              "mdpi"
+            ]
+          },
+          {
+            "text": "الفعاليات الاجتماعية الإلزامية كحل للعزلة.",
+            "sourceKeys": []
+          },
+          {
+            "text": "استخدام بيانات الشبكة للحكم على الأفراد، أو مطالبة أي شخص بالحديث عن احتراقه أمام الفريق. ويُحال من يحتاج إلى دعم شخصي على انفراد إلى برنامج مساعدة الموظفين.",
+            "sourceKeys": []
+          }
+        ]
+      },
+      "steps": [
+        {
+          "order": 1,
+          "dueOffsetDays": 5,
+          "ownerRole": "MANAGER",
+          "verification": "NONE",
+          "evidenceLevel": "Moderate",
+          "sourceKeys": [
+            "bes"
+          ],
+          "en": {
+            "workstream": "1 · Work conditions",
+            "when": "Days 1–5",
+            "title": "Brief the manager, then involve the team",
+            "body": "HR shares the team-level results with the {department} manager and makes clear the review is about workload, not performance. The manager then asks the team to name, anonymously, the three things that cost the most time or energy for the least value.",
+            "who": "HR and {department} manager",
+            "output": "Anonymous list of workload drains",
+            "evidenceNote": "Involving employees in the changes reduced exhaustion in participatory interventions."
+          },
+          "ar": {
+            "workstream": "1 · ظروف العمل",
+            "when": "الأيام 1–5",
+            "title": "إطلاع المدير ثم إشراك الفريق",
+            "body": "تشارك الموارد البشرية النتائج على مستوى الفريق مع مدير {department}، وتوضح أن المراجعة تتعلق بعبء العمل لا بالأداء. ثم يطلب المدير من الفريق ذكر ثلاثة أمور تستهلك أكبر قدر من الوقت أو الجهد مقابل أقل قيمة، دون ذكر الأسماء.",
+            "who": "الموارد البشرية ومدير {department}",
+            "output": "قائمة مجهولة المصدر بما يستنزف الوقت",
+            "evidenceNote": "إشراك الموظفين في التغييرات خفّض الإنهاك في التدخلات التشاركية."
+          }
+        },
+        {
+          "order": 2,
+          "dueOffsetDays": 14,
+          "ownerRole": "MANAGER",
+          "verification": "NONE",
+          "evidenceLevel": "Moderate",
+          "sourceKeys": [
+            "bes",
+            "pan"
+          ],
+          "en": {
+            "workstream": "1 · Work conditions",
+            "when": "Weeks 1–2",
+            "title": "Map the work and agree two reductions",
+            "body": "List every project, recurring meeting and on-call duty with the people each takes, and mark each one keep, delay, stop or move. Agree two changes that remove real hours; the executive sponsor approves them in writing.",
+            "who": "{department} manager, executive sponsor, HR",
+            "output": "Two approved reductions with start dates",
+            "evidenceNote": "Workload-focused and organisation-directed interventions reduced burnout more than individual ones."
+          },
+          "ar": {
+            "workstream": "1 · ظروف العمل",
+            "when": "الأسبوعان 1–2",
+            "title": "رسم خريطة العمل والاتفاق على تخفيضين",
+            "body": "حصر كل المشاريع والاجتماعات الدورية ومهام المناوبة وعدد الأشخاص الذين يحتاجهم كل منها، وتصنيف كل بند: يستمر أو يؤجَّل أو يتوقف أو يُنقل. ثم الاتفاق على تغييرين يوفران ساعات فعلية، ويعتمدهما الراعي التنفيذي كتابياً.",
+            "who": "مدير {department} والراعي التنفيذي والموارد البشرية",
+            "output": "تخفيضان معتمدان بتواريخ بدء",
+            "evidenceNote": "التدخلات التي تستهدف عبء العمل وتنظيم العمل خفّضت الاحتراق أكثر من التدخلات الفردية."
+          }
+        },
+        {
+          "order": 3,
+          "dueOffsetDays": 28,
+          "ownerRole": "MANAGER",
+          "verification": "NONE",
+          "evidenceLevel": "Strong",
+          "sourceKeys": [
+            "moen"
+          ],
+          "en": {
+            "workstream": "1 · Work conditions",
+            "when": "Weeks 2–4",
+            "title": "Give the team control over working time",
+            "body": "The team agrees its own rules for core hours, after-hours messages and swapping on-call shifts, and the manager commits to supporting personal demands.",
+            "who": "{department} team and manager",
+            "output": "Written team working-time agreement",
+            "evidenceNote": "A randomised field trial of this approach reduced burnout, stress and distress over 12 months."
+          },
+          "ar": {
+            "workstream": "1 · ظروف العمل",
+            "when": "الأسابيع 2–4",
+            "title": "منح الفريق تحكماً في وقت العمل",
+            "body": "يتفق الفريق على قواعده الخاصة لساعات العمل الأساسية والرسائل بعد الدوام وتبادل المناوبات، ويلتزم المدير بدعم الالتزامات الشخصية.",
+            "who": "فريق {department} ومديره",
+            "output": "اتفاق مكتوب للفريق حول وقت العمل",
+            "evidenceNote": "تجربة ميدانية عشوائية لهذا النهج خفّضت الاحتراق والضغط والضيق النفسي على مدى 12 شهراً."
+          }
+        },
+        {
+          "order": 4,
+          "dueOffsetDays": 21,
+          "ownerRole": "MANAGER",
+          "verification": "CALENDAR_MEETING_LOAD",
+          "evidenceLevel": "Moderate",
+          "sourceKeys": [
+            "laker",
+            "cross"
+          ],
+          "en": {
+            "workstream": "1 · Work conditions",
+            "when": "Week 3",
+            "title": "Cut meeting load",
+            "body": "Introduce one meeting-free day a week and pause all recurring meetings for two weeks, then bring back only those the team still needs.",
+            "who": "{department} manager",
+            "output": "Meeting-free day in place; recurring meetings reviewed",
+            "evidenceNote": "Observational data from 76 companies; the pause is practitioner evidence."
+          },
+          "ar": {
+            "workstream": "1 · ظروف العمل",
+            "when": "الأسبوع 3",
+            "title": "تقليل عبء الاجتماعات",
+            "body": "تخصيص يوم أسبوعي بلا اجتماعات، وإيقاف كل الاجتماعات الدورية لمدة أسبوعين ثم إعادة ما يحتاجه الفريق فقط.",
+            "who": "مدير {department}",
+            "output": "يوم بلا اجتماعات ومراجعة الاجتماعات الدورية",
+            "evidenceNote": "بيانات رصدية من 76 شركة؛ وإيقاف الاجتماعات مبني على تجارب عملية."
+          }
+        },
+        {
+          "order": 5,
+          "dueOffsetDays": 7,
+          "ownerRole": "MANAGER",
+          "verification": "CALENDAR_ONE_TO_ONE",
+          "evidenceLevel": "Strong",
+          "sourceKeys": [
+            "castro",
+            "flin"
+          ],
+          "en": {
+            "workstream": "2 · Manager contact",
+            "when": "From week 1",
+            "title": "Start needs-focused one-to-ones",
+            "body": "The manager holds a 30-minute one-to-one with each person every week or two. Ask: What is taking more of your time than it should? What is blocking you? What can I remove or unblock? Agree one action each time.",
+            "who": "{department} manager",
+            "output": "One-to-ones in every calendar",
+            "evidenceNote": "A randomised trial in over 1,000 teams: needs-focused one-to-ones raised psychological safety, most in the lowest teams. Effect small."
+          },
+          "ar": {
+            "workstream": "2 · التواصل مع المدير",
+            "when": "من الأسبوع 1",
+            "title": "بدء لقاءات فردية تركز على الاحتياجات",
+            "body": "يعقد المدير لقاءً فردياً مدته 30 دقيقة مع كل شخص كل أسبوع أو أسبوعين، ويسأل: ما الذي يأخذ من وقتك أكثر مما ينبغي؟ ما الذي يعيقك؟ ما الذي يمكنني إزالته عنك أو تسهيله؟ ويتفقان على إجراء واحد في كل لقاء.",
+            "who": "مدير {department}",
+            "output": "لقاءات فردية في كل التقاويم",
+            "evidenceNote": "تجربة عشوائية في أكثر من 1,000 فريق: رفعت اللقاءات الفردية التي تركز على الاحتياجات الأمان النفسي، وأكثر ما رفعته في الفرق الأدنى. الأثر صغير."
+          }
+        },
+        {
+          "order": 6,
+          "dueOffsetDays": 60,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Strong",
+          "sourceKeys": [
+            "lac",
+            "scan"
+          ],
+          "en": {
+            "workstream": "2 · Manager contact",
+            "when": "Month 2",
+            "title": "Support the manager to build the habit",
+            "body": "Three short, spaced sessions for the manager with practice and feedback on supportive one-to-one conversations, based on what the team raised.",
+            "who": "HR, with an external facilitator if needed",
+            "output": "Three sessions completed",
+            "evidenceNote": "Leadership training with practice, feedback and spaced sessions transfers to the job; relationship-based training helped most where relationships started weakest."
+          },
+          "ar": {
+            "workstream": "2 · التواصل مع المدير",
+            "when": "الشهر 2",
+            "title": "دعم المدير لترسيخ العادة",
+            "body": "ثلاث جلسات قصيرة ومتباعدة للمدير تتضمن تدريباً عملياً وتغذية راجعة على إدارة اللقاءات الفردية الداعمة، بناءً على ما طرحه الفريق.",
+            "who": "الموارد البشرية، مع ميسّر خارجي عند الحاجة",
+            "output": "إتمام الجلسات الثلاث",
+            "evidenceNote": "التدريب القيادي الذي يتضمن تطبيقاً عملياً وتغذية راجعة وجلسات متباعدة ينتقل إلى العمل، وأفاد التدريب القائم على العلاقة أكثر حيث كانت العلاقات أضعف."
+          }
+        },
+        {
+          "order": 7,
+          "dueOffsetDays": 42,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Hypothesis",
+          "sourceKeys": [
+            "lone",
+            "yang",
+            "cross"
+          ],
+          "en": {
+            "workstream": "3 · Connection",
+            "when": "November, then monthly",
+            "title": "Joint working session with {partner_department}",
+            "body": "A 60 to 90 minute session in working hours on one real problem both teams share, ending with actions owned jointly. Each team names a contact for cross-team questions, rotated quarterly.",
+            "who": "HR facilitates; both teams attend",
+            "output": "Joint actions and named contacts",
+            "evidenceNote": "Isolation correlates with burnout, and remote work reduces cross-team ties; joint work as the fix is untested."
+          },
+          "ar": {
+            "workstream": "3 · التواصل بين الفرق",
+            "when": "نوفمبر، ثم شهرياً",
+            "title": "جلسة عمل مشتركة مع {partner_department}",
+            "body": "جلسة مدتها من 60 إلى 90 دقيقة خلال ساعات العمل حول مشكلة حقيقية يشترك فيها الفريقان، تنتهي بإجراءات بمسؤولية مشتركة. ويسمّي كل فريق جهة تواصل للمسائل المشتركة تتغير كل ربع سنة.",
+            "who": "تيسير الموارد البشرية وحضور الفريقين",
+            "output": "إجراءات مشتركة وجهات تواصل مسماة",
+            "evidenceNote": "العزلة ترتبط بالاحتراق، والعمل عن بُعد يقلل الروابط بين الفرق؛ أما العمل المشترك كحل فلم يُختبر بعد."
+          }
+        },
+        {
+          "order": 8,
+          "dueOffsetDays": 84,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Moderate",
+          "sourceKeys": [
+            "act",
+            "cbi"
+          ],
+          "en": {
+            "workstream": "4 · Check progress",
+            "when": "Rounds 2 and 3",
+            "title": "Re-measure and confirm the cause",
+            "body": "Compare burnout with round 1 and add the manager relationship and psychological safety scales to confirm whether management is a driver. If burnout has not moved, deepen the workload changes rather than adding programmes.",
+            "who": "HR",
+            "output": "Burnout below 50 over two rounds",
+            "evidenceNote": "Action planning after a survey improved the next results; 50 is the high-burnout line in the scale manual."
+          },
+          "ar": {
+            "workstream": "4 · مراجعة التقدم",
+            "when": "الجولتان 2 و3",
+            "title": "إعادة القياس وتأكيد السبب",
+            "body": "مقارنة الاحتراق بالجولة الأولى، وإضافة مقياسي العلاقة مع المدير والأمان النفسي للتأكد إن كانت الإدارة عاملاً مؤثراً. وإذا لم يتحسن الاحتراق، تُعمَّق تغييرات عبء العمل بدلاً من إضافة برامج.",
+            "who": "الموارد البشرية",
+            "output": "احتراق أقل من 50 خلال جولتين",
+            "evidenceNote": "وضع خطط عمل بعد الاستبيان حسّن نتائج الجولة التالية؛ و50 هو حد الاحتراق المرتفع في دليل المقياس."
+          }
+        }
+      ]
+    },
+    {
+      "key": "EARLY_WORKLOAD_CHECK",
+      "trigger": {
+        "all": [
+          "burnout_elevated"
+        ],
+        "none": [
+          "high_isolation",
+          "low_manager_reciprocity"
+        ],
+        "priority": "MEDIUM",
+        "note": "Burnout at 50 or more without a serious network signal."
+      },
+      "title": {
+        "en": "{department}: check workload early and join the cross-team sessions",
+        "ar": "{department}: متابعة عبء العمل مبكراً والانضمام إلى الجلسات المشتركة"
+      },
+      "intro": {
+        "en": "Light merged plan for borderline burnout and isolation. It uses the same one-to-ones and joint sessions as the {partner_department} plan, and moves to a full workload review only if scores rise.",
+        "ar": "خطة مدمجة خفيفة لاحتراق وعزلة على الحد. تستخدم اللقاءات الفردية والجلسات المشتركة نفسها المستخدمة في خطة {partner_department}، ولا تنتقل إلى مراجعة شاملة لعبء العمل إلا إذا ارتفعت الدرجات."
+      },
+      "doneWhen": {
+        "en": "Every team member has had a one-to-one, one change has been made, burnout is below 50 at round 2 and isolation is at or below 54.",
+        "ar": "حصول كل عضو في الفريق على لقاء فردي، وتنفيذ تغيير واحد، وانخفاض الاحتراق إلى أقل من 50 في الجولة الثانية، وبقاء العزلة عند 54 أو أقل."
+      },
+      "watchFor": {
+        "en": [
+          {
+            "text": "Telling the team it is \"at risk\". The scores are borderline, and alarm can make them worse.",
+            "sourceKeys": []
+          },
+          {
+            "text": "One-to-ones that collect concerns but lead to no change. Broken commitments lower trust.",
+            "sourceKeys": [
+              "topa"
+            ]
+          }
+        ],
+        "ar": [
+          {
+            "text": "إبلاغ الفريق بأنه «في دائرة الخطر». فالدرجات على الحد، والقلق قد يزيدها سوءاً.",
+            "sourceKeys": []
+          },
+          {
+            "text": "لقاءات فردية تجمع المخاوف دون أن يتبعها تغيير. فعدم الوفاء بالالتزامات يضعف الثقة.",
+            "sourceKeys": [
+              "topa"
+            ]
+          }
+        ]
+      },
+      "steps": [
+        {
+          "order": 1,
+          "dueOffsetDays": 7,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Moderate",
+          "sourceKeys": [
+            "act"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "Week 1",
+            "title": "Brief the {department} manager",
+            "body": "HR shares the team-level results and frames them as an early check, not a warning.",
+            "who": "HR",
+            "output": "Manager understands the results",
+            "evidenceNote": "Sharing results with managers so they plan actions improved the next survey modestly."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "الأسبوع 1",
+            "title": "إطلاع مدير {department} على النتائج",
+            "body": "تشارك الموارد البشرية النتائج على مستوى الفريق وتقدمها كمتابعة مبكرة لا كتحذير.",
+            "who": "الموارد البشرية",
+            "output": "فهم المدير للنتائج",
+            "evidenceNote": "مشاركة النتائج مع المديرين ليضعوا خطط عمل حسّنت الاستبيان التالي بشكل محدود."
+          }
+        },
+        {
+          "order": 2,
+          "dueOffsetDays": 21,
+          "ownerRole": "MANAGER",
+          "verification": "CALENDAR_ONE_TO_ONE",
+          "evidenceLevel": "Strong",
+          "sourceKeys": [
+            "castro"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "Weeks 1–3",
+            "title": "Workload one-to-ones",
+            "body": "The manager meets each team member for 30 minutes using the same three questions as the {partner_department} plan, focused on workload and what gets in the way.",
+            "who": "{department} manager",
+            "output": "One-to-one with every team member",
+            "evidenceNote": "Needs-focused one-to-ones raised psychological safety in a randomised trial; effect small."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "الأسابيع 1–3",
+            "title": "لقاءات فردية حول عبء العمل",
+            "body": "يلتقي المدير كل عضو في الفريق لمدة 30 دقيقة مستخدماً الأسئلة الثلاثة نفسها المستخدمة في خطة {partner_department}، مع التركيز على عبء العمل وما يعيقه.",
+            "who": "مدير {department}",
+            "output": "لقاء فردي مع كل عضو في الفريق",
+            "evidenceNote": "رفعت اللقاءات الفردية التي تركز على الاحتياجات الأمان النفسي في تجربة عشوائية؛ الأثر صغير."
+          }
+        },
+        {
+          "order": 3,
+          "dueOffsetDays": 28,
+          "ownerRole": "MANAGER",
+          "verification": "NONE",
+          "evidenceLevel": "Moderate",
+          "sourceKeys": [
+            "andersen"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "Weeks 2–4",
+            "title": "Support for client-facing strain",
+            "body": "If client burnout is the highest of the three burnout subscales, add a weekly 20-minute case discussion, prompt feedback after difficult calls, and rotation off the hardest queues.",
+            "who": "{department} manager",
+            "output": "Weekly case discussion in place",
+            "evidenceNote": "These strategies were linked to lower burnout across 129 workplaces; observational, modest effects."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "الأسابيع 2–4",
+            "title": "دعم الضغط الناتج عن التعامل مع العملاء",
+            "body": "إذا كان الاحتراق المرتبط بالعملاء هو الأعلى بين مقاييس الاحتراق الفرعية الثلاثة، تُضاف مناقشة أسبوعية للحالات مدتها 20 دقيقة، وتغذية راجعة سريعة بعد المكالمات الصعبة، وتدوير الموظفين بعيداً عن أصعب قوائم الانتظار.",
+            "who": "مدير {department}",
+            "output": "مناقشة أسبوعية للحالات",
+            "evidenceNote": "ارتبطت هذه الاستراتيجيات بانخفاض الاحتراق في 129 مكان عمل؛ دراسة رصدية بآثار محدودة."
+          }
+        },
+        {
+          "order": 4,
+          "dueOffsetDays": 28,
+          "ownerRole": "MANAGER",
+          "verification": "NONE",
+          "evidenceLevel": "Moderate",
+          "sourceKeys": [
+            "bes",
+            "topa"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "Week 4",
+            "title": "Fix one thing with the team",
+            "body": "List themes that came up more than once, without names, pick one the team can change within two weeks, and tell the team it came from their input.",
+            "who": "{department} manager and HR",
+            "output": "One change made and explained",
+            "evidenceNote": "Participatory change reduced exhaustion; visible follow-through protects trust."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "الأسبوع 4",
+            "title": "معالجة أمر واحد مع الفريق",
+            "body": "حصر الموضوعات التي تكررت أكثر من مرة دون أسماء، واختيار موضوع يستطيع الفريق تغييره خلال أسبوعين، ثم إبلاغ الفريق بأنه جاء من مساهماتهم.",
+            "who": "مدير {department} والموارد البشرية",
+            "output": "تغيير واحد منفّذ وموضّح للفريق",
+            "evidenceNote": "التغيير التشاركي خفّض الإنهاك، والوفاء الظاهر بالالتزامات يحمي الثقة."
+          }
+        },
+        {
+          "order": 5,
+          "dueOffsetDays": 42,
+          "ownerRole": "MANAGER",
+          "verification": "NONE",
+          "evidenceLevel": "Hypothesis",
+          "sourceKeys": [
+            "lone"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "November",
+            "title": "Join the joint session with {partner_department}",
+            "body": "{department} takes part in the monthly working session on the shared problem.",
+            "who": "{department} team",
+            "output": "{department} attending monthly",
+            "evidenceNote": "Isolation correlates with burnout; joint work as the fix is untested."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "نوفمبر",
+            "title": "الانضمام إلى الجلسة المشتركة مع {partner_department}",
+            "body": "يشارك {department} في جلسة العمل الشهرية حول المشكلة المشتركة.",
+            "who": "فريق {department}",
+            "output": "مشاركة {department} شهرياً",
+            "evidenceNote": "العزلة ترتبط بالاحتراق؛ أما العمل المشترك كحل فلم يُختبر بعد."
+          }
+        },
+        {
+          "order": 6,
+          "dueOffsetDays": 84,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Hypothesis",
+          "sourceKeys": [
+            "cbi"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "Monthly and round 2",
+            "title": "Monitor and escalate if needed",
+            "body": "HR watches isolation monthly and burnout at round 2. If burnout reaches 75, or a second serious signal appears, {department} moves to the full workload plan.",
+            "who": "HR",
+            "output": "Burnout below 50; isolation at or below 54",
+            "evidenceNote": "Escalation follows Mindlign's merge rules; 50 is the manual's high-burnout line."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "شهرياً والجولة الثانية",
+            "title": "المتابعة والتصعيد عند الحاجة",
+            "body": "تراقب الموارد البشرية العزلة شهرياً والاحتراق في الجولة الثانية. وإذا بلغ الاحتراق 75 أو ظهرت إشارة خطيرة ثانية، ينتقل {department} إلى خطة كاملة مثل خطة عبء العمل الكاملة.",
+            "who": "الموارد البشرية",
+            "output": "احتراق أقل من 50، وعزلة عند 54 أو أقل",
+            "evidenceNote": "يتبع التصعيد قواعد الدمج في Mindlign؛ و50 هو حد الاحتراق المرتفع في الدليل."
+          }
+        }
+      ]
+    },
+    {
+      "key": "MEASUREMENT_GAP",
+      "trigger": {
+        "missing_scale": true,
+        "priority": "STANDARD",
+        "scope": "organisation",
+        "note": "Any department is missing one or more of CBI, PSYCH_SAFETY, LMX7, TURNOVER."
+      },
+      "title": {
+        "en": "Complete the measurement",
+        "ar": "استكمال القياس"
+      },
+      "intro": {
+        "en": "Closes the data gaps so the next round can confirm or rule out causes.",
+        "ar": "تسد الفجوات في البيانات حتى تتمكن الجولة التالية من تأكيد الأسباب أو استبعادها."
+      },
+      "doneWhen": {
+        "en": "Every department has all five measures and at least 5 respondents.",
+        "ar": "توفر المقاييس الخمسة كلها في كل قسم، مع 5 مشاركين على الأقل."
+      },
+      "watchFor": {
+        "en": [
+          {
+            "text": "Changing the wording of existing questions, which breaks the comparison between rounds.",
+            "sourceKeys": []
+          },
+          {
+            "text": "Launching without saying what changed since round 1.",
+            "sourceKeys": [
+              "topa"
+            ]
+          }
+        ],
+        "ar": [
+          {
+            "text": "تغيير صياغة الأسئلة الحالية، مما يُفقد إمكانية المقارنة بين الجولات.",
+            "sourceKeys": []
+          },
+          {
+            "text": "إطلاق الاستبيان دون إبلاغ الموظفين بما تغير منذ الجولة الأولى.",
+            "sourceKeys": [
+              "topa"
+            ]
+          }
+        ]
+      },
+      "steps": [
+        {
+          "order": 1,
+          "dueOffsetDays": 3,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Operational",
+          "sourceKeys": [],
+          "en": {
+            "workstream": null,
+            "when": "Now",
+            "title": "Add the missing measures",
+            "body": "Add psychological safety, manager relationship and intention to leave to round 2 for every department. Keep the burnout questions exactly as they were so the rounds compare.",
+            "who": "HR",
+            "output": "Round 2 survey ready",
+            "evidenceNote": ""
+          },
+          "ar": {
+            "workstream": null,
+            "when": "الآن",
+            "title": "إضافة المقاييس الناقصة",
+            "body": "إضافة الأمان النفسي والعلاقة مع المدير ونية ترك العمل إلى الجولة الثانية لكل الأقسام، مع إبقاء أسئلة الاحتراق كما هي تماماً لإمكان المقارنة.",
+            "who": "الموارد البشرية",
+            "output": "استبيان الجولة الثانية جاهز",
+            "evidenceNote": ""
+          }
+        },
+        {
+          "order": 2,
+          "dueOffsetDays": 3,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Operational",
+          "sourceKeys": [],
+          "en": {
+            "workstream": null,
+            "when": "Now",
+            "title": "Pick the dates",
+            "body": "Schedule round 2 for 8 to 12 weeks after round 1, avoiding Ramadan, Eid, year-end close and major deadlines.",
+            "who": "HR",
+            "output": "Launch and close dates set",
+            "evidenceNote": ""
+          },
+          "ar": {
+            "workstream": null,
+            "when": "الآن",
+            "title": "تحديد المواعيد",
+            "body": "جدولة الجولة الثانية بعد 8 إلى 12 أسبوعاً من الأولى، مع تجنب رمضان والأعياد وإقفال نهاية السنة والمواعيد النهائية الكبرى.",
+            "who": "الموارد البشرية",
+            "output": "تحديد موعدي الإطلاق والإغلاق",
+            "evidenceNote": ""
+          }
+        },
+        {
+          "order": 3,
+          "dueOffsetDays": 42,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Operational",
+          "sourceKeys": [],
+          "en": {
+            "workstream": null,
+            "when": "2 weeks before",
+            "title": "Make sure every department can be shown",
+            "body": "Each department needs at least 5 respondents or its results stay hidden. Encourage participation in small teams in particular.",
+            "who": "HR",
+            "output": "Participation plan for small teams",
+            "evidenceNote": "A privacy safeguard."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "قبل أسبوعين",
+            "title": "التأكد من إمكانية عرض كل قسم",
+            "body": "يحتاج كل قسم إلى 5 مشاركين على الأقل وإلا تبقى نتائجه مخفية. ويُشجَّع على المشاركة في الفرق الصغيرة خاصة.",
+            "who": "الموارد البشرية",
+            "output": "خطة مشاركة للفرق الصغيرة",
+            "evidenceNote": "إجراء لحماية الخصوصية."
+          }
+        },
+        {
+          "order": 4,
+          "dueOffsetDays": 49,
+          "ownerRole": "SPONSOR",
+          "verification": "NONE",
+          "evidenceLevel": "Moderate",
+          "sourceKeys": [
+            "topa",
+            "jiang",
+            "act"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "1 week before",
+            "title": "Report back on round 1",
+            "body": "A short message from leadership on what round 1 showed at company level and what has been done since. Keeping visible commitments protects trust.",
+            "who": "Executive sponsor and HR",
+            "output": "Message sent",
+            "evidenceNote": "Transparent communication predicts trust, and acting on survey results improves the next round."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "قبل أسبوع",
+            "title": "إبلاغ الموظفين بنتائج الجولة الأولى",
+            "body": "رسالة قصيرة من القيادة حول ما أظهرته الجولة الأولى على مستوى الشركة وما اتُّخذ منذ ذلك الحين. فالوفاء الظاهر بالالتزامات يحمي الثقة.",
+            "who": "الراعي التنفيذي والموارد البشرية",
+            "output": "إرسال الرسالة",
+            "evidenceNote": "التواصل الشفاف يتنبأ بالثقة، والعمل على نتائج الاستبيان يحسّن الجولة التالية."
+          }
+        },
+        {
+          "order": 5,
+          "dueOffsetDays": 56,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Moderate",
+          "sourceKeys": [
+            "gal"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "Launch",
+            "title": "Run the survey",
+            "body": "Keep it to about 10 minutes and open for two weeks, with one reminder halfway through.",
+            "who": "HR",
+            "output": "Survey closed",
+            "evidenceNote": "Longer announced surveys were started by fewer people."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "الإطلاق",
+            "title": "تنفيذ الاستبيان",
+            "body": "يُبقى في حدود 10 دقائق ومفتوحاً أسبوعين، مع تذكير واحد في منتصف المدة.",
+            "who": "الموارد البشرية",
+            "output": "إغلاق الاستبيان",
+            "evidenceNote": "عدد أقل من الناس بدأ الاستبيانات التي أُعلن أنها أطول."
+          }
+        },
+        {
+          "order": 6,
+          "dueOffsetDays": 84,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Hypothesis",
+          "sourceKeys": [],
+          "en": {
+            "workstream": null,
+            "when": "After round 2",
+            "title": "Answer the management question",
+            "body": "Compare the flagged department's manager relationship score with the low manager contact in the network data. If both are low, management is a confirmed driver and that department's plan is updated.",
+            "who": "HR",
+            "output": "Data gap closed",
+            "evidenceNote": "Confirming a network signal with survey data is Mindlign's triangulation rule."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "بعد الجولة الثانية",
+            "title": "الإجابة عن سؤال الإدارة",
+            "body": "مقارنة درجة العلاقة مع المدير في القسم المعني بانخفاض التواصل مع المدير في بيانات الشبكة. وإذا كان كلاهما منخفضاً، تصبح الإدارة عاملاً مؤكداً وتُحدَّث خطة ذلك القسم.",
+            "who": "الموارد البشرية",
+            "output": "سد الفجوة في البيانات",
+            "evidenceNote": "تأكيد إشارة الشبكة ببيانات الاستبيان هو قاعدة التثليث في Mindlign."
+          }
+        }
+      ]
+    },
+    {
+      "key": "LEARN_FROM_HEALTHY",
+      "trigger": {
+        "healthy_signals_min": 2,
+        "risk_signals_max": 0,
+        "priority": "STANDARD",
+        "note": "Two or more healthy scores and no risk signals."
+      },
+      "title": {
+        "en": "Learn from {department}",
+        "ar": "التعلّم من {department}"
+      },
+      "intro": {
+        "en": "Healthy departments get a plan to spread what works.",
+        "ar": "تحصل الأقسام السليمة على خطة لنشر ما ينجح."
+      },
+      "doneWhen": {
+        "en": "Every manager has received the practices and has tried at least one.",
+        "ar": "استلام كل المديرين للممارسات، وتجربة كل منهم لممارسة واحدة على الأقل."
+      },
+      "watchFor": {
+        "en": [
+          {
+            "text": "Presenting {department} as the model team, which can make others defensive. Frame it as sharing what works.",
+            "sourceKeys": []
+          },
+          {
+            "text": "Copying practices without adapting them to each team's work.",
+            "sourceKeys": []
+          }
+        ],
+        "ar": [
+          {
+            "text": "تقديم {department} على أنها الفريق النموذجي، مما قد يضع الفرق الأخرى في موقف دفاعي. الأفضل تقديمها كمشاركة لما ينجح.",
+            "sourceKeys": []
+          },
+          {
+            "text": "نسخ الممارسات دون تكييفها لطبيعة عمل كل فريق.",
+            "sourceKeys": []
+          }
+        ]
+      },
+      "steps": [
+        {
+          "order": 1,
+          "dueOffsetDays": 7,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Practice",
+          "sourceKeys": [
+            "baxter"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "Week 1",
+            "title": "Interview the {department} manager",
+            "body": "A 45-minute conversation on how the team plans work, runs one-to-ones, raises problems, recognises good work and protects people from overload.",
+            "who": "HR",
+            "output": "Interview notes",
+            "evidenceNote": "Learning from the best-performing team is widely used but rarely tested."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "الأسبوع 1",
+            "title": "مقابلة مدير {department}",
+            "body": "حوار مدته 45 دقيقة حول طريقة الفريق في تخطيط العمل، وإدارة اللقاءات الفردية، وطرح المشكلات، وتقدير العمل الجيد، وحماية الأفراد من الإرهاق.",
+            "who": "الموارد البشرية",
+            "output": "ملاحظات المقابلة",
+            "evidenceNote": "التعلم من الفريق الأفضل أداءً شائع الاستخدام لكنه نادراً ما اختُبر."
+          }
+        },
+        {
+          "order": 2,
+          "dueOffsetDays": 21,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Practice",
+          "sourceKeys": [
+            "baxter"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "Week 3",
+            "title": "Write up three to five practices",
+            "body": "One page, each practice specific enough for another manager to copy: \"a 15-minute workload check every Sunday\", not \"good communication\".",
+            "who": "HR",
+            "output": "One-page practice summary",
+            "evidenceNote": ""
+          },
+          "ar": {
+            "workstream": null,
+            "when": "الأسبوع 3",
+            "title": "توثيق ثلاث إلى خمس ممارسات",
+            "body": "صفحة واحدة، تُوصف فيها كل ممارسة بدقة تكفي ليطبقها مدير آخر: «مراجعة لعبء العمل مدتها 15 دقيقة كل يوم أحد»، لا «تواصل جيد».",
+            "who": "الموارد البشرية",
+            "output": "ملخص الممارسات في صفحة واحدة",
+            "evidenceNote": ""
+          }
+        },
+        {
+          "order": 3,
+          "dueOffsetDays": 28,
+          "ownerRole": "MANAGER",
+          "verification": "NONE",
+          "evidenceLevel": "Moderate",
+          "sourceKeys": [
+            "act"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "Week 4",
+            "title": "Share at a managers' meeting",
+            "body": "The {department} manager presents the practices to the other managers, and each manager picks one to try for the quarter.",
+            "who": "{department} manager and department managers",
+            "output": "One chosen practice per manager",
+            "evidenceNote": "Committing to actions after survey results improved the next results modestly."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "الأسبوع 4",
+            "title": "المشاركة في اجتماع المديرين",
+            "body": "يعرض مدير {department} الممارسات على المديرين الآخرين، ويختار كل مدير ممارسة واحدة يجربها خلال الربع.",
+            "who": "مدير {department} ومديرو الأقسام",
+            "output": "ممارسة مختارة لكل مدير",
+            "evidenceNote": "الالتزام بإجراءات بعد نتائج الاستبيان حسّن النتائج التالية بشكل محدود."
+          }
+        },
+        {
+          "order": 4,
+          "dueOffsetDays": 56,
+          "ownerRole": "MANAGER",
+          "verification": "NONE",
+          "evidenceLevel": "Strong",
+          "sourceKeys": [
+            "stajk"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "Ongoing",
+            "title": "Recognise the teams that try them",
+            "body": "Leaders give specific, timely recognition to teams that adopt a practice, alongside feedback on how it is going.",
+            "who": "Department managers",
+            "output": "Recognition given",
+            "evidenceNote": "Social recognition and feedback improved performance across 72 studies."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "مستمر",
+            "title": "تقدير الفرق التي تجربها",
+            "body": "يقدّم المديرون تقديراً محدداً وفي وقته للفرق التي تتبنى ممارسة، مع تغذية راجعة حول سير التطبيق.",
+            "who": "مديرو الأقسام",
+            "output": "تقديم التقدير",
+            "evidenceNote": "التقدير الاجتماعي والتغذية الراجعة حسّنا الأداء في 72 دراسة."
+          }
+        },
+        {
+          "order": 5,
+          "dueOffsetDays": 90,
+          "ownerRole": "HR",
+          "verification": "NONE",
+          "evidenceLevel": "Moderate",
+          "sourceKeys": [
+            "act"
+          ],
+          "en": {
+            "workstream": null,
+            "when": "End of quarter",
+            "title": "Review",
+            "body": "Check which practices were tried and whether they seem to help, alongside the next survey results.",
+            "who": "HR",
+            "output": "Practices kept, adapted or dropped",
+            "evidenceNote": "Repeated action planning gave the largest improvement."
+          },
+          "ar": {
+            "workstream": null,
+            "when": "نهاية الربع",
+            "title": "المراجعة",
+            "body": "التحقق من الممارسات التي جُرّبت وما إذا كانت تبدو مفيدة، إلى جانب نتائج الاستبيان التالي.",
+            "who": "الموارد البشرية",
+            "output": "الإبقاء على الممارسات أو تكييفها أو إيقافها",
+            "evidenceNote": "تكرار التخطيط للإجراءات حقق أكبر تحسن."
+          }
+        }
+      ]
+    }
+  ]
+}
