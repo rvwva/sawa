@@ -10,7 +10,7 @@ import {
   renderStepText,
 } from "../services/planTemplates";
 import { auditLog } from "../middleware/audit";
-import { AuditAction, StepState, StepUpdateType } from "@prisma/client";
+import { AuditAction, PlanStatus, Prisma, StepState, StepUpdateType } from "@prisma/client";
 
 export const plansRouter = Router();
 
@@ -43,6 +43,17 @@ export function stepDisplayStatus(state: StepState, dueAt: Date | null, now: Dat
   return "upcoming";
 }
 
+const MANAGER_VISIBLE_STATUSES: PlanStatus[] = ["ACTIVE", "COMPLETED"];
+
+function withDisplayStatus<T extends { state: StepState; dueAt: Date | null }>(step: T, now = new Date()) {
+  return { ...step, displayStatus: stepDisplayStatus(step.state, step.dueAt, now) };
+}
+
+function planWithDisplayStatus<T extends { steps: { state: StepState; dueAt: Date | null }[] }>(plan: T) {
+  const now = new Date();
+  return { ...plan, steps: plan.steps.map((s) => withDisplayStatus(s, now)) };
+}
+
 // ─── GET /api/plans/:orgId ────────────────────────────────────────────────────
 
 plansRouter.get(
@@ -63,7 +74,9 @@ plansRouter.get(
       const plans = await prisma.actionPlan.findMany({
         where: {
           organisationId: orgId,
-          ...(user.role === "MANAGER" ? { departmentId: user.departmentId! } : {}),
+          ...(user.role === "MANAGER"
+            ? { departmentId: user.departmentId!, status: { in: MANAGER_VISIBLE_STATUSES } }
+            : {}),
         },
         include: {
           steps: { orderBy: { order: "asc" } },
@@ -72,7 +85,7 @@ plansRouter.get(
         orderBy: { createdAt: "desc" },
       });
 
-      return res.json(plans.filter((p) => canViewPlan(user, p)));
+      return res.json(plans.filter((p) => canViewPlan(user, p)).map(planWithDisplayStatus));
     } catch (err) {
       next(err);
     }
@@ -100,7 +113,10 @@ plansRouter.get(
 
       if (!plan) return res.status(404).json({ error: "Plan not found" });
       if (!canViewPlan(req.user!, plan)) return res.status(403).json({ error: "Access denied" });
-      return res.json(plan);
+      if (req.user!.role === "MANAGER" && !MANAGER_VISIBLE_STATUSES.includes(plan.status)) {
+        return res.status(404).json({ error: "Plan not found" });
+      }
+      return res.json(planWithDisplayStatus(plan));
     } catch (err) {
       next(err);
     }
@@ -270,6 +286,23 @@ plansRouter.post(
 );
 
 // ─── POST /api/plans/steps/:id/updates ───────────────────────────────────────
+// Records an update and applies its state change in one transaction.
+
+const MIN_NOTE_LENGTH = 10;
+
+const UPDATE_RULES: Record<
+  StepUpdateType,
+  { state?: StepState; completedAt?: "set" | "clear"; note?: "required" | "min"; leadershipOnly?: boolean }
+> = {
+  DONE: { state: "DONE", completedAt: "set" },
+  NOT_YET: { state: "IN_PROGRESS" },
+  NEEDS_SUPPORT: { state: "NEEDS_SUPPORT", note: "min" },
+  ADAPTED: { state: "ADAPTED", note: "min" },
+  REOPENED: { state: "IN_PROGRESS", completedAt: "clear" },
+  COMMENT: { note: "required" },
+  ACKNOWLEDGED: { leadershipOnly: true },
+  SUPPORT_OFFERED: { leadershipOnly: true },
+};
 
 plansRouter.post(
   "/steps/:id/updates",
@@ -279,30 +312,58 @@ plansRouter.post(
     try {
       const step = await prisma.actionStep.findUnique({
         where: { id: req.params.id },
-        include: { plan: { select: { organisationId: true, departmentId: true } } },
+        include: { plan: { select: { organisationId: true, departmentId: true, status: true } } },
       });
 
       if (!step) return res.status(404).json({ error: "Step not found" });
       if (!canUpdateStep(req.user!, step)) return res.status(403).json({ error: "Access denied" });
 
-      const { type, note } = req.body as { type?: string; note?: string };
+      const { type, note } = req.body as { type?: string; note?: unknown };
       if (!type || !(type in StepUpdateType)) {
         return res.status(400).json({ error: `type must be one of: ${Object.values(StepUpdateType).join(", ")}` });
       }
+      const rule = UPDATE_RULES[type as StepUpdateType];
 
-      const update = await prisma.stepUpdate.create({
-        data: { stepId: step.id, userId: req.user!.userId, type: type as StepUpdateType, note: note ?? null },
+      // canUpdateStep already limits EXECUTIVE to the same organisation.
+      if (rule.leadershipOnly && req.user!.role === "MANAGER") {
+        return res.status(403).json({ error: `${type} can only be sent by HR or an administrator` });
+      }
+
+      const trimmed = typeof note === "string" ? note.trim() : "";
+      if (rule.note === "min" && trimmed.length < MIN_NOTE_LENGTH) {
+        return res.status(400).json({ error: `${type} needs a note of at least ${MIN_NOTE_LENGTH} characters` });
+      }
+      if (rule.note === "required" && trimmed.length === 0) {
+        return res.status(400).json({ error: `${type} needs a note` });
+      }
+
+      if (step.plan.status !== "ACTIVE") {
+        return res.status(409).json({ error: "Updates can only be added to an ACTIVE plan" });
+      }
+
+      const stepData: Prisma.ActionStepUpdateInput = {};
+      if (rule.state) stepData.state = rule.state;
+      if (rule.completedAt === "set") stepData.completedAt = new Date();
+      if (rule.completedAt === "clear") stepData.completedAt = null;
+
+      const updatedStep = await prisma.$transaction(async (tx) => {
+        await tx.stepUpdate.create({
+          data: { stepId: step.id, userId: req.user!.userId, type: type as StepUpdateType, note: trimmed || null },
+        });
+        return Object.keys(stepData).length
+          ? tx.actionStep.update({ where: { id: step.id }, data: stepData })
+          : tx.actionStep.findUniqueOrThrow({ where: { id: step.id } });
       });
 
       await auditLog(AuditAction.STEP_UPDATED, {
         userId: req.user!.userId,
         entityType: "ActionStep",
         entityId: step.id,
-        metadata: { type, note },
+        metadata: { type, from: step.state, to: updatedStep.state },
         req,
       });
 
-      return res.status(201).json(update);
+      return res.status(201).json(withDisplayStatus(updatedStep));
     } catch (err) {
       next(err);
     }
@@ -310,11 +371,12 @@ plansRouter.post(
 );
 
 // ─── PATCH /api/plans/steps/:id ──────────────────────────────────────────────
+// Leadership edits to owner and due date. State changes go through /updates.
 
 plansRouter.patch(
   "/steps/:id",
   requireAuth,
-  requireRole("ADMIN", "EXECUTIVE", "MANAGER"),
+  requireRole("ADMIN", "EXECUTIVE"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const step = await prisma.actionStep.findUnique({
@@ -325,28 +387,41 @@ plansRouter.patch(
       if (!step) return res.status(404).json({ error: "Step not found" });
       if (!canUpdateStep(req.user!, step)) return res.status(403).json({ error: "Access denied" });
 
-      const { state } = req.body as { state?: string };
-      if (!state || !(state in StepState)) {
-        return res.status(400).json({ error: `state must be one of: ${Object.values(StepState).join(", ")}` });
+      const { ownerUserId, dueAt } = req.body as { ownerUserId?: string; dueAt?: string };
+      if (ownerUserId === undefined && dueAt === undefined) {
+        return res.status(400).json({ error: "Provide ownerUserId and/or dueAt" });
       }
 
-      const completedAt =
-        state === "DONE" ? (step.state === "DONE" ? step.completedAt : new Date()) : null;
+      const data: Prisma.ActionStepUncheckedUpdateInput = {};
 
-      const updated = await prisma.actionStep.update({
-        where: { id: step.id },
-        data: { state: state as StepState, completedAt },
-      });
+      if (ownerUserId !== undefined) {
+        const owner = await prisma.user.findFirst({
+          where: { id: ownerUserId, organisationId: step.plan.organisationId, isActive: true, deletedAt: null },
+        });
+        if (!owner) return res.status(400).json({ error: "ownerUserId is not an active user in this organisation" });
+        data.ownerUserId = owner.id;
+      }
+
+      if (dueAt !== undefined) {
+        const parsed = new Date(dueAt);
+        if (Number.isNaN(parsed.getTime())) return res.status(400).json({ error: "dueAt must be a valid date" });
+        data.dueAt = computeDueAt(parsed, 0);
+      }
+
+      const updated = await prisma.actionStep.update({ where: { id: step.id }, data });
 
       await auditLog(AuditAction.STEP_EDITED, {
         userId: req.user!.userId,
         entityType: "ActionStep",
         entityId: step.id,
-        metadata: { from: step.state, to: state },
+        metadata: {
+          ...(data.ownerUserId !== undefined ? { ownerUserId: { from: step.ownerUserId, to: data.ownerUserId } } : {}),
+          ...(data.dueAt !== undefined ? { dueAt: { from: step.dueAt, to: data.dueAt } } : {}),
+        },
         req,
       });
 
-      return res.json(updated);
+      return res.json(withDisplayStatus(updated));
     } catch (err) {
       next(err);
     }

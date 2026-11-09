@@ -41,6 +41,7 @@ export const prisma = {
   actionStep: {
     findMany: jest.fn().mockResolvedValue([]),
     findUnique: jest.fn().mockResolvedValue(null),
+    findUniqueOrThrow: jest.fn().mockResolvedValue({}),
     update: jest.fn().mockResolvedValue({}),
   },
   stepUpdate: {

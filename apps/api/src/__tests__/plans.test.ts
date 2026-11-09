@@ -86,71 +86,239 @@ describe("GET /api/plans/:orgId/:id for MANAGER", () => {
     expect(res.status).toBe(403);
   });
 
-  it("own department plan → 200", async () => {
-    p.actionPlan.findFirst.mockResolvedValueOnce({ id: "plan-1", organisationId: "org-1", departmentId: "dept-1", steps: [] });
+  const step = { id: "s1", state: "IN_PROGRESS", dueAt: new Date(Date.now() + 30 * 86400000) };
+
+  it("own department ACTIVE plan → 200 with displayStatus on each step", async () => {
+    p.actionPlan.findFirst.mockResolvedValueOnce({
+      id: "plan-1", organisationId: "org-1", departmentId: "dept-1", status: "ACTIVE", steps: [step],
+    });
     const res = await request(plansApp())
       .get("/api/plans/org-1/plan-1")
       .set("Authorization", `Bearer ${token(MANAGER)}`);
     expect(res.status).toBe(200);
+    expect(res.body.steps[0].displayStatus).toBe("on_track");
   });
 
-  it("list query is limited to the manager's department", async () => {
-    p.actionPlan.findMany.mockResolvedValueOnce([]);
-    await request(plansApp()).get("/api/plans/org-1").set("Authorization", `Bearer ${token(MANAGER)}`);
-    expect(p.actionPlan.findMany.mock.calls[0][0].where).toEqual({ organisationId: "org-1", departmentId: "dept-1" });
+  it.each(["DRAFT", "ARCHIVED"])("own department %s plan → 404", async (status) => {
+    p.actionPlan.findFirst.mockResolvedValueOnce({
+      id: "plan-1", organisationId: "org-1", departmentId: "dept-1", status, steps: [],
+    });
+    const res = await request(plansApp())
+      .get("/api/plans/org-1/plan-1")
+      .set("Authorization", `Bearer ${token(MANAGER)}`);
+    expect(res.status).toBe(404);
+  });
+
+  it("EXECUTIVE can see a DRAFT plan", async () => {
+    p.actionPlan.findFirst.mockResolvedValueOnce({
+      id: "plan-1", organisationId: "org-1", departmentId: "dept-1", status: "DRAFT", steps: [],
+    });
+    const res = await request(plansApp())
+      .get("/api/plans/org-1/plan-1")
+      .set("Authorization", `Bearer ${token(EXEC)}`);
+    expect(res.status).toBe(200);
+  });
+
+  it("list query is limited to the manager's department and approved plans, with displayStatus", async () => {
+    p.actionPlan.findMany.mockResolvedValueOnce([
+      { id: "plan-1", organisationId: "org-1", departmentId: "dept-1", status: "ACTIVE", steps: [step] },
+    ]);
+    const res = await request(plansApp()).get("/api/plans/org-1").set("Authorization", `Bearer ${token(MANAGER)}`);
+    expect(p.actionPlan.findMany.mock.calls[0][0].where).toEqual({
+      organisationId: "org-1",
+      departmentId: "dept-1",
+      status: { in: ["ACTIVE", "COMPLETED"] },
+    });
+    expect(res.body[0].steps[0].displayStatus).toBe("on_track");
   });
 });
 
-// ─── Step ownership ──────────────────────────────────────────────────────────
+// ─── Step updates (record + state change) ────────────────────────────────────
 
-describe("PATCH /api/plans/steps/:id ownership", () => {
-  const stepOwnedBy = (ownerUserId: string | null) => ({
+describe("POST /api/plans/steps/:id/updates", () => {
+  const stepRow = (over: Record<string, unknown> = {}) => ({
     id: "step-1",
     state: "IN_PROGRESS",
+    dueAt: null,
     completedAt: null,
-    ownerUserId,
-    plan: { organisationId: "org-1", departmentId: "dept-1" },
+    ownerUserId: "mgr-1",
+    plan: { organisationId: "org-1", departmentId: "dept-1", status: "ACTIVE" },
+    ...over,
   });
 
-  it("MANAGER who is not the owner → 403", async () => {
-    p.actionStep.findUnique.mockResolvedValueOnce(stepOwnedBy("other-user"));
-    const res = await request(plansApp())
+  beforeEach(() => {
+    p.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(p));
+    p.actionStep.update.mockImplementation(({ data }: any) => Promise.resolve({ ...stepRow(), ...data }));
+    p.actionStep.findUniqueOrThrow.mockResolvedValue(stepRow());
+  });
+
+  function post(user: object, body: object) {
+    return request(plansApp())
+      .post("/api/plans/steps/step-1/updates")
+      .set("Authorization", `Bearer ${token(user)}`)
+      .send(body);
+  }
+
+  it("DONE records the update and sets state + completedAt in one transaction", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow());
+    const res = await post(MANAGER, { type: "DONE" });
+    expect(res.status).toBe(201);
+    expect(p.$transaction).toHaveBeenCalledTimes(1);
+    expect(p.stepUpdate.create.mock.calls[0][0].data).toMatchObject({ stepId: "step-1", type: "DONE", userId: "mgr-1" });
+    const data = p.actionStep.update.mock.calls[0][0].data;
+    expect(data.state).toBe("DONE");
+    expect(data.completedAt).toBeInstanceOf(Date);
+    expect(res.body.state).toBe("DONE");
+    expect(res.body.displayStatus).toBe("done");
+  });
+
+  it("REOPENED sets IN_PROGRESS and clears completedAt", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow({ state: "DONE", completedAt: new Date() }));
+    const res = await post(MANAGER, { type: "REOPENED" });
+    expect(res.status).toBe(201);
+    const data = p.actionStep.update.mock.calls[0][0].data;
+    expect(data).toEqual({ state: "IN_PROGRESS", completedAt: null });
+  });
+
+  it("NOT_YET → IN_PROGRESS", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow({ state: "NOT_STARTED" }));
+    await post(MANAGER, { type: "NOT_YET" });
+    expect(p.actionStep.update.mock.calls[0][0].data).toEqual({ state: "IN_PROGRESS" });
+  });
+
+  it("NEEDS_SUPPORT with a 5-character note → 400", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow());
+    const res = await post(MANAGER, { type: "NEEDS_SUPPORT", note: "help!" });
+    expect(res.status).toBe(400);
+    expect(p.stepUpdate.create).not.toHaveBeenCalled();
+  });
+
+  it("ADAPTED note is measured after trimming", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow());
+    const res = await post(MANAGER, { type: "ADAPTED", note: "   short     " });
+    expect(res.status).toBe(400);
+  });
+
+  it("NEEDS_SUPPORT with a 10+ character note → state NEEDS_SUPPORT", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow());
+    const res = await post(MANAGER, { type: "NEEDS_SUPPORT", note: "  Team is short two people  " });
+    expect(res.status).toBe(201);
+    expect(p.actionStep.update.mock.calls[0][0].data).toEqual({ state: "NEEDS_SUPPORT" });
+    expect(p.stepUpdate.create.mock.calls[0][0].data.note).toBe("Team is short two people");
+  });
+
+  it("COMMENT without a note → 400; with a note → no state change", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow());
+    expect((await post(MANAGER, { type: "COMMENT" })).status).toBe(400);
+
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow());
+    const res = await post(MANAGER, { type: "COMMENT", note: "ok" });
+    expect(res.status).toBe(201);
+    expect(p.actionStep.update).not.toHaveBeenCalled();
+    expect(res.body.displayStatus).toBeDefined();
+  });
+
+  it.each(["ACKNOWLEDGED", "SUPPORT_OFFERED"])("MANAGER sending %s → 403", async (type) => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow());
+    const res = await post(MANAGER, { type });
+    expect(res.status).toBe(403);
+    expect(p.stepUpdate.create).not.toHaveBeenCalled();
+  });
+
+  it("EXECUTIVE of the same org may send ACKNOWLEDGED; state unchanged", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow());
+    const res = await post(EXEC, { type: "ACKNOWLEDGED" });
+    expect(res.status).toBe(201);
+    expect(p.actionStep.update).not.toHaveBeenCalled();
+  });
+
+  it("EXECUTIVE of another org → 403 on ACKNOWLEDGED", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow());
+    const res = await post({ ...EXEC, organisationId: "org-2" }, { type: "ACKNOWLEDGED" });
+    expect(res.status).toBe(403);
+  });
+
+  it("update on a DRAFT plan → 409", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(
+      stepRow({ plan: { organisationId: "org-1", departmentId: "dept-1", status: "DRAFT" } })
+    );
+    const res = await post(EXEC, { type: "DONE" });
+    expect(res.status).toBe(409);
+    expect(p.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("MANAGER who does not own the step → 403", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow({ ownerUserId: "someone-else" }));
+    const res = await post(MANAGER, { type: "DONE" });
+    expect(res.status).toBe(403);
+  });
+});
+
+// ─── PATCH: owner / due date (leadership only) ───────────────────────────────
+
+describe("PATCH /api/plans/steps/:id", () => {
+  const stepRow = {
+    id: "step-1",
+    state: "NOT_STARTED",
+    dueAt: null,
+    ownerUserId: "mgr-1",
+    plan: { organisationId: "org-1", departmentId: "dept-1" },
+  };
+
+  beforeEach(() => {
+    p.actionStep.update.mockImplementation(({ data }: any) => Promise.resolve({ ...stepRow, ...data }));
+  });
+
+  function patch(user: object, body: object) {
+    return request(plansApp())
       .patch("/api/plans/steps/step-1")
-      .set("Authorization", `Bearer ${token(MANAGER)}`)
-      .send({ state: "DONE" });
+      .set("Authorization", `Bearer ${token(user)}`)
+      .send(body);
+  }
+
+  it("MANAGER → 403, even on their own step", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow);
+    const res = await patch(MANAGER, { dueAt: "2026-12-01" });
     expect(res.status).toBe(403);
     expect(p.actionStep.update).not.toHaveBeenCalled();
   });
 
-  it("MANAGER who owns the step → 200 and completedAt is set on DONE", async () => {
-    p.actionStep.findUnique.mockResolvedValueOnce(stepOwnedBy("mgr-1"));
-    p.actionStep.update.mockResolvedValueOnce({ id: "step-1" });
-    const res = await request(plansApp())
-      .patch("/api/plans/steps/step-1")
-      .set("Authorization", `Bearer ${token(MANAGER)}`)
-      .send({ state: "DONE" });
+  it("EXECUTIVE reassigns owner to an active user in the org", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow);
+    p.user.findFirst.mockResolvedValueOnce({ id: "mgr-2" });
+    const res = await patch(EXEC, { ownerUserId: "mgr-2" });
     expect(res.status).toBe(200);
-    const data = p.actionStep.update.mock.calls[0][0].data;
-    expect(data.state).toBe("DONE");
-    expect(data.completedAt).toBeInstanceOf(Date);
+    expect(p.user.findFirst.mock.calls[0][0].where).toMatchObject({
+      id: "mgr-2", organisationId: "org-1", isActive: true, deletedAt: null,
+    });
+    expect(p.actionStep.update.mock.calls[0][0].data).toEqual({ ownerUserId: "mgr-2" });
+    expect(res.body.displayStatus).toBeDefined();
   });
 
-  it("moving out of DONE clears completedAt", async () => {
-    p.actionStep.findUnique.mockResolvedValueOnce({ ...stepOwnedBy("mgr-1"), state: "DONE", completedAt: new Date() });
-    p.actionStep.update.mockResolvedValueOnce({ id: "step-1" });
-    await request(plansApp())
-      .patch("/api/plans/steps/step-1")
-      .set("Authorization", `Bearer ${token(MANAGER)}`)
-      .send({ state: "IN_PROGRESS" });
-    expect(p.actionStep.update.mock.calls[0][0].data.completedAt).toBeNull();
+  it("owner not in the org → 400", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow);
+    p.user.findFirst.mockResolvedValueOnce(null);
+    const res = await patch(EXEC, { ownerUserId: "outsider" });
+    expect(res.status).toBe(400);
   });
 
-  it("MANAGER cannot post an update on someone else's step", async () => {
-    p.actionStep.findUnique.mockResolvedValueOnce(stepOwnedBy("other-user"));
-    const res = await request(plansApp())
-      .post("/api/plans/steps/step-1/updates")
-      .set("Authorization", `Bearer ${token(MANAGER)}`)
-      .send({ type: "COMMENT" });
+  it("dueAt on a Friday moves to Thursday", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow);
+    await patch(EXEC, { dueAt: "2026-11-13T10:00:00Z" }); // Friday
+    const due: Date = p.actionStep.update.mock.calls[0][0].data.dueAt;
+    expect(due.toISOString().slice(0, 10)).toBe("2026-11-12");
+  });
+
+  it("state alone is rejected — state changes go through /updates", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow);
+    const res = await patch(EXEC, { state: "DONE" });
+    expect(res.status).toBe(400);
+    expect(p.actionStep.update).not.toHaveBeenCalled();
+  });
+
+  it("EXECUTIVE of another org → 403", async () => {
+    p.actionStep.findUnique.mockResolvedValueOnce(stepRow);
+    const res = await patch({ ...EXEC, organisationId: "org-2" }, { dueAt: "2026-12-01" });
     expect(res.status).toBe(403);
   });
 });
