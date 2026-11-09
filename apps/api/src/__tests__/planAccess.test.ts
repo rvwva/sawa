@@ -1,7 +1,3 @@
-/**
- * Unit tests for planAccess.ts — canViewPlan and canUpdateStep.
- */
-
 import { canViewPlan, canUpdateStep } from "../services/planAccess";
 import { AuthPayload } from "../middleware/auth";
 
@@ -10,85 +6,93 @@ const ORG_B = "org-b";
 const DEPT_1 = "dept-1";
 const DEPT_2 = "dept-2";
 
-function admin(): AuthPayload {
-  return { userId: "u1", email: "a@a.com", role: "ADMIN", organisationId: null };
-}
-
-function executive(orgId: string): AuthPayload {
-  return { userId: "u2", email: "e@a.com", role: "EXECUTIVE", organisationId: orgId };
-}
-
-function manager(orgId: string, deptId: string): AuthPayload {
-  return { userId: "u3", email: "m@a.com", role: "MANAGER", organisationId: orgId, departmentId: deptId };
-}
-
-function employee(): AuthPayload {
-  return { userId: "u4", email: "emp@a.com", role: "EMPLOYEE", organisationId: ORG_A };
-}
-
-// ─── canViewPlan ─────────────────────────────────────────────────────────────
+const admin: AuthPayload = { userId: "admin", email: "a@x.com", role: "ADMIN", organisationId: null };
+const exec = (org: string): AuthPayload => ({ userId: "exec", email: "e@x.com", role: "EXECUTIVE", organisationId: org });
+const manager = (org: string, dept: string | null, userId = "mgr"): AuthPayload => ({
+  userId,
+  email: "m@x.com",
+  role: "MANAGER",
+  organisationId: org,
+  departmentId: dept,
+});
+const employee: AuthPayload = { userId: "emp", email: "x@x.com", role: "EMPLOYEE", organisationId: ORG_A };
 
 describe("canViewPlan", () => {
   const deptPlan = { organisationId: ORG_A, departmentId: DEPT_1 };
-  const orgWidePlan = { organisationId: ORG_A, departmentId: null };
+  const orgWide = { organisationId: ORG_A, departmentId: null };
 
-  it("ADMIN → true for any plan", () => {
-    expect(canViewPlan(admin(), deptPlan)).toBe(true);
-    expect(canViewPlan(admin(), orgWidePlan)).toBe(true);
+  it("ADMIN sees every plan", () => {
+    expect(canViewPlan(admin, deptPlan)).toBe(true);
+    expect(canViewPlan(admin, orgWide)).toBe(true);
   });
 
-  it("EXECUTIVE same org → true", () => {
-    expect(canViewPlan(executive(ORG_A), deptPlan)).toBe(true);
-    expect(canViewPlan(executive(ORG_A), orgWidePlan)).toBe(true);
+  it("EXECUTIVE sees own-org plans, including org-wide", () => {
+    expect(canViewPlan(exec(ORG_A), deptPlan)).toBe(true);
+    expect(canViewPlan(exec(ORG_A), orgWide)).toBe(true);
   });
 
-  it("EXECUTIVE different org → false", () => {
-    expect(canViewPlan(executive(ORG_B), deptPlan)).toBe(false);
+  it("EXECUTIVE of another org → false", () => {
+    expect(canViewPlan(exec(ORG_B), deptPlan)).toBe(false);
   });
 
-  it("MANAGER same org same dept → true", () => {
+  it("MANAGER sees own department's plan", () => {
     expect(canViewPlan(manager(ORG_A, DEPT_1), deptPlan)).toBe(true);
   });
 
-  it("MANAGER same org different dept → false", () => {
+  it("MANAGER cannot see another department's plan", () => {
     expect(canViewPlan(manager(ORG_A, DEPT_2), deptPlan)).toBe(false);
   });
 
-  it("MANAGER same org org-wide plan (null dept) → true", () => {
-    expect(canViewPlan(manager(ORG_A, DEPT_1), orgWidePlan)).toBe(true);
+  it("MANAGER cannot see organisation-wide plans", () => {
+    expect(canViewPlan(manager(ORG_A, DEPT_1), orgWide)).toBe(false);
   });
 
-  it("MANAGER different org → false", () => {
+  it("MANAGER without a department sees nothing", () => {
+    expect(canViewPlan(manager(ORG_A, null), deptPlan)).toBe(false);
+    expect(canViewPlan(manager(ORG_A, null), orgWide)).toBe(false);
+  });
+
+  it("MANAGER of another org with same dept id → false", () => {
     expect(canViewPlan(manager(ORG_B, DEPT_1), deptPlan)).toBe(false);
   });
 
   it("EMPLOYEE → false", () => {
-    expect(canViewPlan(employee(), deptPlan)).toBe(false);
+    expect(canViewPlan(employee, deptPlan)).toBe(false);
   });
 });
 
-// ─── canUpdateStep ───────────────────────────────────────────────────────────
-
 describe("canUpdateStep", () => {
-  const step = { plan: { organisationId: ORG_A, departmentId: DEPT_1 } };
+  const plan = { organisationId: ORG_A, departmentId: DEPT_1 };
+  const ownedByMgr = { ownerUserId: "mgr", plan };
+  const ownedByOther = { ownerUserId: "someone-else", plan };
+  const unowned = { ownerUserId: null, plan };
 
   it("ADMIN → true", () => {
-    expect(canUpdateStep(admin(), step)).toBe(true);
+    expect(canUpdateStep(admin, ownedByOther)).toBe(true);
   });
 
-  it("EXECUTIVE same org → true", () => {
-    expect(canUpdateStep(executive(ORG_A), step)).toBe(true);
+  it("EXECUTIVE same org → true regardless of owner", () => {
+    expect(canUpdateStep(exec(ORG_A), ownedByOther)).toBe(true);
+    expect(canUpdateStep(exec(ORG_A), unowned)).toBe(true);
   });
 
-  it("EXECUTIVE wrong org → false", () => {
-    expect(canUpdateStep(executive(ORG_B), step)).toBe(false);
+  it("EXECUTIVE other org → false", () => {
+    expect(canUpdateStep(exec(ORG_B), ownedByOther)).toBe(false);
   });
 
-  it("MANAGER same dept → true", () => {
-    expect(canUpdateStep(manager(ORG_A, DEPT_1), step)).toBe(true);
+  it("MANAGER who owns the step → true", () => {
+    expect(canUpdateStep(manager(ORG_A, DEPT_1, "mgr"), ownedByMgr)).toBe(true);
   });
 
-  it("MANAGER different dept → false", () => {
-    expect(canUpdateStep(manager(ORG_A, DEPT_2), step)).toBe(false);
+  it("MANAGER in the same department but not the owner → false", () => {
+    expect(canUpdateStep(manager(ORG_A, DEPT_1, "mgr"), ownedByOther)).toBe(false);
+  });
+
+  it("MANAGER on an unassigned step → false", () => {
+    expect(canUpdateStep(manager(ORG_A, DEPT_1, "mgr"), unowned)).toBe(false);
+  });
+
+  it("EMPLOYEE → false", () => {
+    expect(canUpdateStep(employee, ownedByMgr)).toBe(false);
   });
 });

@@ -15,8 +15,14 @@ const loginValidation = [
   body("password").isLength({ min: 8 }),
 ];
 
-function issueTokens(userId: string, email: string, role: string, organisationId: string | null) {
-  const payload = { userId, email, role, organisationId };
+export function issueTokens(
+  userId: string,
+  email: string,
+  role: string,
+  organisationId: string | null,
+  departmentId: string | null
+) {
+  const payload = { userId, email, role, organisationId, departmentId };
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {
     expiresIn: (process.env.JWT_EXPIRES_IN ?? "8h") as StringValue,
   });
@@ -52,7 +58,8 @@ authRouter.post("/login", loginValidation, async (req: Request, res: Response, n
       user.id,
       user.email,
       user.role,
-      user.organisationId
+      user.organisationId,
+      user.departmentId
     );
 
     const expiresAt = new Date();
@@ -72,6 +79,7 @@ authRouter.post("/login", loginValidation, async (req: Request, res: Response, n
         lastName: user.lastName,
         role: user.role,
         organisationId: user.organisationId,
+        departmentId: user.departmentId,
       },
     });
   } catch (err) { next(err); }
@@ -93,7 +101,7 @@ authRouter.post("/refresh", async (req: Request, res: Response) => {
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });
     if (!user || !user.isActive) return res.status(401).json({ error: "User not found" });
 
-    const tokens = issueTokens(user.id, user.email, user.role, user.organisationId);
+    const tokens = issueTokens(user.id, user.email, user.role, user.organisationId, user.departmentId);
 
     // Rotate refresh token
     await prisma.refreshToken.update({ where: { id: stored.id }, data: { revokedAt: new Date() } });
@@ -136,6 +144,7 @@ authRouter.get("/me", requireAuth, async (req: Request, res: Response, next: Nex
         lastName: true,
         role: true,
         organisationId: true,
+        departmentId: true,
         lastLoginAt: true,
       },
     });

@@ -49,4 +49,15 @@ export const prisma = {
   auditLog: {
     create: jest.fn().mockResolvedValue({}),
   },
+  user: {
+    findFirst: jest.fn().mockResolvedValue(null),
+    findUnique: jest.fn().mockResolvedValue(null),
+  },
+  respondent: {
+    count: jest.fn().mockResolvedValue(0),
+  },
+  score: {
+    findMany: jest.fn().mockResolvedValue([]),
+  },
+  $transaction: jest.fn(),
 };

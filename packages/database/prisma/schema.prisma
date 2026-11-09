@@ -170,7 +170,8 @@ model Department {
   onaMetrics      OnaMetric[]
   onaInsightCards OnaInsightCard[]
   users           User[]           @relation("UserDepartment")
-  actionPlans     ActionPlan[]
+  actionPlans     ActionPlan[]     @relation("PlanDepartment")
+  partnerPlans    ActionPlan[]     @relation("PlanPartnerDepartment")
 
   @@map("departments")
 }
@@ -192,12 +193,14 @@ model User {
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
 
-  organisation  Organisation?  @relation(fields: [organisationId], references: [id])
-  department    Department?    @relation("UserDepartment", fields: [departmentId], references: [id])
-  refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]
-  approvedPlans ActionPlan[]   @relation("PlanApprover")
-  stepUpdates   StepUpdate[]
+  organisation   Organisation?  @relation(fields: [organisationId], references: [id])
+  department     Department?    @relation("UserDepartment", fields: [departmentId], references: [id])
+  refreshTokens  RefreshToken[]
+  auditLogs      AuditLog[]
+  approvedPlans  ActionPlan[]   @relation("PlanApprover")
+  sponsoredPlans ActionPlan[]   @relation("PlanSponsor")
+  ownedSteps     ActionStep[]   @relation("StepOwner")
+  stepUpdates    StepUpdate[]
 
   @@map("users")
 }
@@ -497,46 +500,74 @@ model OnaConsentLog {
 // ─── Action Plans ────────────────────────────────────────────────────────────
 
 model ActionPlan {
-  id             String       @id @default(cuid())
-  organisationId String       @map("organisation_id")
-  departmentId   String?      @map("department_id") // null = org-wide (e.g. MEASUREMENT_GAP)
-  templateKey    String       @map("template_key")
-  priority       PlanPriority
-  status         PlanStatus   @default(DRAFT)
-  titleEn        String       @map("title_en")
-  titleAr        String       @map("title_ar")
-  approvedById   String?      @map("approved_by_id")
-  approvedAt     DateTime?    @map("approved_at")
-  dueAt          DateTime?    @map("due_at")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  id                  String       @id @default(cuid())
+  organisationId      String       @map("organisation_id")
+  departmentId        String?      @map("department_id") // null = org-wide (e.g. MEASUREMENT_GAP)
+  partnerDepartmentId String?      @map("partner_department_id")
+  sponsorUserId       String?      @map("sponsor_user_id")
+  templateKey         String       @map("template_key")
+  priority            PlanPriority
+  status              PlanStatus   @default(DRAFT)
+  titleEn             String       @map("title_en")
+  titleAr             String       @map("title_ar")
+  introEn             String       @map("intro_en")
+  introAr             String       @map("intro_ar")
+  doneWhenEn          String       @map("done_when_en")
+  doneWhenAr          String       @map("done_when_ar")
+  watchForEn          Json         @map("watch_for_en") // [{ text, sourceKeys }]
+  watchForAr          Json         @map("watch_for_ar")
+  signalsSnapshot     Json         @map("signals_snapshot") // insight card signals + scale averages at generation
+  approvedById        String?      @map("approved_by_id")
+  approvedAt          DateTime?    @map("approved_at")
+  dueAt               DateTime?    @map("due_at")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
 
-  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  department   Department?  @relation(fields: [departmentId], references: [id])
-  approvedBy   User?        @relation("PlanApprover", fields: [approvedById], references: [id])
-  steps        ActionStep[]
+  organisation      Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  department        Department?  @relation("PlanDepartment", fields: [departmentId], references: [id])
+  partnerDepartment Department?  @relation("PlanPartnerDepartment", fields: [partnerDepartmentId], references: [id])
+  sponsor           User?        @relation("PlanSponsor", fields: [sponsorUserId], references: [id])
+  approvedBy        User?        @relation("PlanApprover", fields: [approvedById], references: [id])
+  steps             ActionStep[]
 
   @@index([organisationId])
   @@map("action_plans")
 }
 
 model ActionStep {
-  id            String           @id @default(cuid())
-  planId        String           @map("plan_id")
-  order         Int
-  titleEn       String           @map("title_en")
-  titleAr       String           @map("title_ar")
-  bodyEn        String           @map("body_en")
-  bodyAr        String           @map("body_ar")
-  ownerRole     StepOwnerRole    @map("owner_role")
-  dueOffsetDays Int              @map("due_offset_days")
-  dueAt         DateTime?        @map("due_at")
-  state         StepState        @default(NOT_STARTED)
-  verification  StepVerification @default(NONE)
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
+  id               String           @id @default(cuid())
+  planId           String           @map("plan_id")
+  order            Int
+  evidenceLevel    String           @map("evidence_level")
+  sourceKeys       String[]         @map("source_keys")
+  workstreamEn     String?          @map("workstream_en")
+  workstreamAr     String?          @map("workstream_ar")
+  whenEn           String           @map("when_en")
+  whenAr           String           @map("when_ar")
+  titleEn          String           @map("title_en")
+  titleAr          String           @map("title_ar")
+  bodyEn           String           @map("body_en")
+  bodyAr           String           @map("body_ar")
+  whoEn            String           @map("who_en")
+  whoAr            String           @map("who_ar")
+  outputEn         String           @map("output_en")
+  outputAr         String           @map("output_ar")
+  evidenceNoteEn   String           @map("evidence_note_en")
+  evidenceNoteAr   String           @map("evidence_note_ar")
+  ownerRole        StepOwnerRole    @map("owner_role")
+  ownerUserId      String?          @map("owner_user_id")
+  dueOffsetDays    Int              @map("due_offset_days")
+  dueAt            DateTime?        @map("due_at")
+  state            StepState        @default(NOT_STARTED)
+  verification     StepVerification @default(NONE)
+  verifiedAt       DateTime?        @map("verified_at")
+  verificationNote String?          @map("verification_note")
+  completedAt      DateTime?        @map("completed_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
 
   plan    ActionPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  owner   User?        @relation("StepOwner", fields: [ownerUserId], references: [id])
   updates StepUpdate[]
 
   @@index([planId])
