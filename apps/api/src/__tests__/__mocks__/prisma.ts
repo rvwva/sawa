@@ -27,4 +27,38 @@ export const prisma = {
     findMany: jest.fn().mockResolvedValue([]),
     create: jest.fn().mockResolvedValue({}),
   },
+  assessmentCycle: {
+    findMany: jest.fn().mockResolvedValue([]),
+    findUnique: jest.fn().mockResolvedValue(null),
+  },
+  actionPlan: {
+    findMany: jest.fn().mockResolvedValue([]),
+    findFirst: jest.fn().mockResolvedValue(null),
+    findUnique: jest.fn().mockResolvedValue(null),
+    create: jest.fn().mockResolvedValue({ id: "plan-1" }),
+    update: jest.fn().mockResolvedValue({}),
+  },
+  actionStep: {
+    findMany: jest.fn().mockResolvedValue([]),
+    findUnique: jest.fn().mockResolvedValue(null),
+    findUniqueOrThrow: jest.fn().mockResolvedValue({}),
+    update: jest.fn().mockResolvedValue({}),
+  },
+  stepUpdate: {
+    create: jest.fn().mockResolvedValue({ id: "su-1" }),
+  },
+  auditLog: {
+    create: jest.fn().mockResolvedValue({}),
+  },
+  user: {
+    findFirst: jest.fn().mockResolvedValue(null),
+    findUnique: jest.fn().mockResolvedValue(null),
+  },
+  respondent: {
+    count: jest.fn().mockResolvedValue(0),
+  },
+  score: {
+    findMany: jest.fn().mockResolvedValue([]),
+  },
+  $transaction: jest.fn(),
 };
